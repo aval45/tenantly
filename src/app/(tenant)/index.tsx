@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Bell, ChevronRight, Megaphone, Wrench } from "lucide-react-native";
-import { Pressable, StyleSheet, View } from "react-native";
-import { billingService } from "@/features/billing/service";
+import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { billingService, summarizeInvoices } from "@/features/billing/service";
 import { getTenantContext } from "@/features/tenant/api";
 import { getSupabaseClient } from "@/shared/api/supabase";
 import { useAuth } from "@/shared/auth/auth-provider";
@@ -10,12 +10,22 @@ import { AppText } from "@/shared/components/app-text";
 import { Screen } from "@/shared/components/screen";
 import { formatMoney } from "@/shared/utils/money";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
+import { queryKeys } from "@/shared/api/query-keys";
+import { formatDate } from "@/shared/utils/date";
+import {
+  EmptyLedger,
+  LoadingSkeleton,
+  StateView,
+} from "@/shared/components/state-views";
 export default function TenantHome() {
   const { session } = useAuth();
   const router = useRouter();
   const colors = useTenantlyColors();
   const query = useQuery({
-    queryKey: ["tenant-dashboard", session?.userId],
+    queryKey: queryKeys.tenantDashboard(
+      session?.userId ?? "",
+      session?.activeOrganizationId ?? "",
+    ),
     queryFn: async () => {
       const [context, invoices, complaints, notices] = await Promise.all([
         getTenantContext(),
@@ -27,6 +37,7 @@ export default function TenantHome() {
         getSupabaseClient()
           .from("notices")
           .select("*")
+          .eq("is_pinned", true)
           .order("is_pinned", { ascending: false })
           .limit(3),
       ]);
@@ -40,9 +51,37 @@ export default function TenantHome() {
       };
     },
   });
-  const current = query.data?.invoices.find((item) => item.balance_paise > 0);
+  const invoiceSummary = summarizeInvoices(query.data?.invoices ?? []);
+  const current = invoiceSummary.nextInvoice;
+  const outstandingPaise = invoiceSummary.outstandingPaise;
+  if (query.isLoading)
+    return (
+      <Screen>
+        <LoadingSkeleton />
+      </Screen>
+    );
+  if (query.isError)
+    return (
+      <Screen>
+        <StateView
+          kind="error"
+          title="Home unavailable"
+          body="Your rent and property information could not be loaded."
+          actionLabel="Retry"
+          onAction={() => void query.refetch()}
+        />
+      </Screen>
+    );
   return (
-    <Screen>
+    <Screen
+      refreshControl={
+        <RefreshControl
+          refreshing={query.isRefetching}
+          onRefresh={() => void query.refetch()}
+          tintColor={colors.primary}
+        />
+      }
+    >
       <View style={s.top}>
         <View>
           <AppText variant="eyebrow" muted>
@@ -74,17 +113,19 @@ export default function TenantHome() {
             RENT LEDGER
           </AppText>
           <AppText variant="caption" style={{ color: colors.heroMuted }}>
-            CURRENT AMOUNT DUE
+            TOTAL AMOUNT DUE
           </AppText>
         </View>
         <AppText
           variant="display"
           style={[s.moneyDisplay, { color: colors.heroText }]}
         >
-          {formatMoney(current?.balance_paise ?? 0)}
+          {formatMoney(outstandingPaise)}
         </AppText>
         <AppText style={{ color: colors.heroMuted }}>
-          {current ? `Due ${current.due_date}` : "You are all caught up"}
+          {current
+            ? `Next due ${formatDate(current.due_date)}`
+            : "You are all caught up"}
         </AppText>
         {current ? (
           <Pressable
@@ -131,6 +172,12 @@ export default function TenantHome() {
       <AppText variant="section" style={s.section}>
         Pinned notices
       </AppText>
+      {!query.data?.notices.length ? (
+        <EmptyLedger
+          title="No pinned notices"
+          body="Important property updates will appear here."
+        />
+      ) : null}
       {query.data?.notices.map((item) => (
         <View key={item.id} style={[s.notice, { borderColor: colors.border }]}>
           <AppText variant="label">{item.title}</AppText>

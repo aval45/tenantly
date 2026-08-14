@@ -3,6 +3,7 @@ import * as Crypto from "expo-crypto";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ImagePlus } from "lucide-react-native";
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { billingService } from "@/features/billing/service";
 import { getSupabaseClient } from "@/shared/api/supabase";
@@ -12,6 +13,10 @@ import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
 import { Screen } from "@/shared/components/screen";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
+import { localDateISO } from "@/shared/utils/date";
+import { prepareProofImage, removeUpload } from "@/shared/storage/uploads";
+import { toUserMessage } from "@/shared/errors/to-user-message";
+import { queryKeys } from "@/shared/api/query-keys";
 const methods: PaymentMethod[] = ["upi", "bank_transfer", "cash", "other"];
 export default function PaymentProof() {
   const { invoiceId, amountPaise } = useLocalSearchParams<{
@@ -21,7 +26,14 @@ export default function PaymentProof() {
   const { session } = useAuth();
   const router = useRouter();
   const colors = useTenantlyColors();
-  const [amount, setAmount] = useState(String(Number(amountPaise) / 100));
+  const cache = useQueryClient();
+  const maximumPaise = Number(amountPaise);
+  const [amount, setAmount] = useState(
+    Number.isFinite(maximumPaise) ? String(maximumPaise / 100) : "",
+  );
+  const [idempotencyKey] = useState(
+    () => `payment-${invoiceId}-${Crypto.randomUUID()}`,
+  );
   const [method, setMethod] = useState<PaymentMethod>("upi");
   const [reference, setReference] = useState("");
   const [asset, setAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
@@ -42,16 +54,17 @@ export default function PaymentProof() {
   async function submit() {
     setSaving(true);
     setError(null);
+    let uploadedPath: string | undefined;
     try {
       let path: string | undefined;
       if (asset) {
-        const response = await fetch(asset.uri);
-        const bytes = await response.arrayBuffer();
-        path = `${session?.activeOrganizationId}/${session?.userId}/${Crypto.randomUUID()}.jpg`;
+        const prepared = await prepareProofImage(asset);
+        path = `${session?.activeOrganizationId}/${session?.userId}/${Crypto.randomUUID()}.${prepared.extension}`;
+        uploadedPath = path;
         const { error: uploadError } = await getSupabaseClient()
           .storage.from("payment-proofs")
-          .upload(path, bytes, {
-            contentType: asset.mimeType ?? "image/jpeg",
+          .upload(path, prepared.bytes, {
+            contentType: prepared.contentType,
             upsert: false,
           });
         if (uploadError) throw uploadError;
@@ -60,16 +73,35 @@ export default function PaymentProof() {
         invoiceId,
         amountPaise: Math.round(Number(amount) * 100),
         method,
-        paidOn: new Date().toISOString().slice(0, 10),
+        paidOn: localDateISO(),
         reference,
         proofPath: path,
-        idempotencyKey: `payment-${invoiceId}-${Date.now()}`,
+        idempotencyKey,
       });
+      await Promise.all([
+        cache.invalidateQueries({
+          queryKey: queryKeys.invoices(
+            session?.userId ?? "",
+            session?.activeOrganizationId ?? "",
+          ),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.payments(
+            session?.userId ?? "",
+            session?.activeOrganizationId ?? "",
+          ),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.tenantDashboard(
+            session?.userId ?? "",
+            session?.activeOrganizationId ?? "",
+          ),
+        }),
+      ]);
       router.replace("/(tenant)/payments" as never);
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Payment submission failed.",
-      );
+      if (uploadedPath) await removeUpload("payment-proofs", uploadedPath);
+      setError(toUserMessage(cause, "Payment submission failed."));
     } finally {
       setSaving(false);
     }
@@ -107,6 +139,7 @@ export default function PaymentProof() {
               key={item}
               accessibilityRole="radio"
               accessibilityState={{ selected: item === method }}
+              aria-checked={item === method}
               onPress={() => setMethod(item)}
               style={[
                 s.method,
@@ -155,7 +188,9 @@ export default function PaymentProof() {
         label={saving ? "Submitting…" : "Submit for review"}
         isDisabled={
           saving ||
+          !Number.isFinite(Number(amount)) ||
           Number(amount) <= 0 ||
+          Math.round(Number(amount) * 100) > maximumPaise ||
           ((method === "upi" || method === "bank_transfer") && !asset)
         }
         onPress={() => void submit()}

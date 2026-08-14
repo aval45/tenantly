@@ -1,48 +1,97 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { ChevronRight, Plus, UserRound } from "lucide-react-native";
-import { Pressable, StyleSheet, View } from "react-native";
+import {
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from "react-native";
 import { residentService } from "@/features/residents/service";
 import { useAuth } from "@/shared/auth/auth-provider";
 import { AppText } from "@/shared/components/app-text";
 import { Screen } from "@/shared/components/screen";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
+import { queryKeys } from "@/shared/api/query-keys";
+import { LoadingSkeleton, StateView } from "@/shared/components/state-views";
 export default function ResidentsScreen() {
   const { session } = useAuth();
   const router = useRouter();
   const colors = useTenantlyColors();
   const org = session?.activeOrganizationId ?? "";
   const query = useQuery({
-    queryKey: ["residents", org],
+    queryKey: queryKeys.residents(session?.userId ?? "", org),
     queryFn: async () => ({
       residents: await residentService.list(org),
       tenancies: await residentService.listActiveTenancies(org),
     }),
     enabled: !!org,
   });
+  if (query.isLoading)
+    return (
+      <Screen>
+        <LoadingSkeleton />
+      </Screen>
+    );
+  if (query.isError)
+    return (
+      <Screen>
+        <StateView
+          kind="error"
+          title="Residents unavailable"
+          body="Resident records could not be loaded."
+          actionLabel="Retry"
+          onAction={() => void query.refetch()}
+        />
+      </Screen>
+    );
+  const tenancies = query.data?.tenancies ?? [];
   return (
-    <Screen>
-      <View style={s.header}>
-        <View style={s.title}>
-          <AppText variant="heading">Residents</AppText>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push("/(owner)/resident-setup" as never)}
-            style={[s.add, { backgroundColor: colors.primary }]}
-          >
-            <Plus size={17} color={colors.background} />
-            <AppText variant="label" style={{ color: colors.background }}>
-              Add
+    <Screen scrollable={false}>
+      <FlatList
+        data={query.data?.residents ?? []}
+        keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl
+            refreshing={query.isRefetching}
+            onRefresh={() => void query.refetch()}
+          />
+        }
+        contentContainerStyle={s.content}
+        ListHeaderComponent={
+          <View style={s.header}>
+            <View style={s.title}>
+              <AppText variant="heading">Residents</AppText>
+              {session?.capabilities.manageOrganization ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() =>
+                    router.push("/(owner)/resident-setup" as never)
+                  }
+                  style={[s.add, { backgroundColor: colors.primary }]}
+                >
+                  <Plus size={17} color={colors.background} />
+                  <AppText variant="label" style={{ color: colors.background }}>
+                    Add
+                  </AppText>
+                </Pressable>
+              ) : null}
+            </View>
+            <AppText muted>
+              Resident identity records exist independently of app accounts.
             </AppText>
-          </Pressable>
-        </View>
-        <AppText muted>
-          Resident identity records exist independently of app accounts.
-        </AppText>
-      </View>
-      <View style={[s.list, { borderColor: colors.border }]}>
-        {query.data?.residents.map((item) => {
-          const tenancy = query.data.tenancies.find(
+          </View>
+        }
+        ListEmptyComponent={
+          <StateView
+            kind="empty"
+            title="No residents"
+            body="Residents assigned to your properties will appear here."
+          />
+        }
+        renderItem={({ item }) => {
+          const tenancy = tenancies.find(
             (value) => value.resident_id === item.id,
           );
           return (
@@ -59,7 +108,7 @@ export default function ResidentsScreen() {
                     : { residentId: item.id },
                 })
               }
-              style={[s.row, { borderBottomColor: colors.border }]}
+              style={[s.row, { borderColor: colors.border }]}
             >
               <View style={[s.avatar, { backgroundColor: colors.primarySoft }]}>
                 <UserRound size={18} color={colors.primary} />
@@ -77,13 +126,14 @@ export default function ResidentsScreen() {
               <ChevronRight size={18} color={colors.textMuted} />
             </Pressable>
           );
-        })}
-      </View>
+        }}
+      />
     </Screen>
   );
 }
 const s = StyleSheet.create({
   header: { gap: 5, paddingVertical: spacing.lg },
+  content: { paddingBottom: spacing.xl },
   title: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -108,7 +158,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     padding: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radii.card,
+    marginBottom: 8,
   },
   avatar: {
     width: 40,

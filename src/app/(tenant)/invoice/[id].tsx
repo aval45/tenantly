@@ -2,17 +2,26 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import { getSupabaseClient } from "@/shared/api/supabase";
+import { queryKeys } from "@/shared/api/query-keys";
+import { useAuth } from "@/shared/auth/auth-provider";
 import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
 import { Screen } from "@/shared/components/screen";
 import { formatMoney } from "@/shared/utils/money";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
+import { formatDate } from "@/shared/utils/date";
+import { LoadingSkeleton, StateView } from "@/shared/components/state-views";
 export default function InvoiceDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const colors = useTenantlyColors();
+  const { session } = useAuth();
   const query = useQuery({
-    queryKey: ["invoice", id],
+    queryKey: queryKeys.invoice(
+      session?.userId ?? "",
+      session?.activeOrganizationId ?? "",
+      id,
+    ),
     queryFn: async () => {
       const client = getSupabaseClient();
       const [invoice, items] = await Promise.all([
@@ -26,6 +35,24 @@ export default function InvoiceDetail() {
     enabled: !!id,
   });
   const invoice = query.data?.invoice;
+  if (query.isLoading)
+    return (
+      <Screen>
+        <LoadingSkeleton />
+      </Screen>
+    );
+  if (query.isError)
+    return (
+      <Screen>
+        <StateView
+          kind="error"
+          title="Invoice unavailable"
+          body="We could not load this invoice."
+          actionLabel="Retry"
+          onAction={() => void query.refetch()}
+        />
+      </Screen>
+    );
   return (
     <Screen>
       <View style={s.header}>
@@ -36,7 +63,9 @@ export default function InvoiceDetail() {
           {invoice?.invoice_number ?? "Loading…"}
         </AppText>
         <AppText muted>
-          {invoice?.period_start} to {invoice?.period_end}
+          {invoice
+            ? `${formatDate(invoice.period_start)} to ${formatDate(invoice.period_end)}`
+            : ""}
         </AppText>
       </View>
       <View style={[s.card, { borderColor: colors.border }]}>

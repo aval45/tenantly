@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/shared/api/supabase";
+import { formatDate } from "@/shared/utils/date";
+import { queryKeys } from "@/shared/api/query-keys";
 import { formatCompactMoney } from "@/shared/utils/money";
 import type { OwnerDashboard } from "./types";
 
@@ -13,11 +15,6 @@ type Aggregate = {
   pendingApprovals: number;
   openComplaints: number;
 };
-export const dashboardKeys = {
-  owner: (organizationId: string) =>
-    ["organizations", organizationId, "dashboard"] as const,
-};
-
 async function getOwnerDashboard(
   organizationId: string,
   ownerName: string,
@@ -51,6 +48,16 @@ async function getOwnerDashboard(
   if (organization.error) throw organization.error;
   if (payments.error) throw payments.error;
   if (complaints.error) throw complaints.error;
+  const payerIds = [
+    ...new Set(payments.data.map((item) => item.payer_resident_id)),
+  ];
+  const { data: residents, error: residentsError } = payerIds.length
+    ? await client.from("residents").select("id,full_name").in("id", payerIds)
+    : { data: [], error: null };
+  if (residentsError) throw residentsError;
+  const residentNames = new Map(
+    residents.map((item) => [item.id, item.full_name]),
+  );
   const values = aggregate as unknown as Aggregate;
   if (!values || values.propertyCount === 0) return null;
   const percent =
@@ -122,12 +129,19 @@ async function getOwnerDashboard(
     ],
     activity: payments.data.map((item) => ({
       id: item.id,
-      personName: "Resident payment",
+      personName:
+        residentNames.get(item.payer_resident_id) ?? "Resident payment",
       description: item.method.replace("_", " "),
       amountPaise: item.amount_paise,
       status:
-        item.status === "submitted" ? ("review" as const) : ("paid" as const),
-      occurredAtLabel: new Date(item.created_at).toLocaleDateString("en-IN"),
+        item.status === "submitted"
+          ? ("review" as const)
+          : item.status === "approved"
+            ? ("paid" as const)
+            : item.status === "rejected"
+              ? ("rejected" as const)
+              : ("refunded" as const),
+      occurredAtLabel: formatDate(item.created_at),
     })),
   };
 }
@@ -136,9 +150,10 @@ export function useOwnerDashboard(
   organizationId: string,
   _legacyScenario?: unknown,
   ownerName = "Owner",
+  userId = "",
 ) {
   return useQuery({
-    queryKey: dashboardKeys.owner(organizationId),
+    queryKey: queryKeys.ownerDashboard(userId, organizationId),
     queryFn: () => getOwnerDashboard(organizationId, ownerName),
     enabled: organizationId !== "unknown",
     staleTime: 30_000,

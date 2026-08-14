@@ -1,16 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { CalendarPlus, ChevronRight, ReceiptText } from "lucide-react-native";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { billingService } from "@/features/billing/service";
 import { useAuth } from "@/shared/auth/auth-provider";
 import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
 import { Screen } from "@/shared/components/screen";
-import { StateView } from "@/shared/components/state-views";
+import { LoadingSkeleton, StateView } from "@/shared/components/state-views";
 import { StatusBadge } from "@/shared/components/status-badge";
 import { formatMoney } from "@/shared/utils/money";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
+import { queryKeys } from "@/shared/api/query-keys";
+import { formatDate, localMonthStartISO } from "@/shared/utils/date";
+import { toUserMessage } from "@/shared/errors/to-user-message";
 export default function RentScreen() {
   const colors = useTenantlyColors();
   const router = useRouter();
@@ -18,18 +21,31 @@ export default function RentScreen() {
   const { session } = useAuth();
   const organizationId = session?.activeOrganizationId ?? "";
   const query = useQuery({
-    queryKey: ["payments", "pending", organizationId],
+    queryKey: [
+      ...queryKeys.payments(session?.userId ?? "", organizationId),
+      "pending",
+    ],
     queryFn: () => billingService.listPendingPayments(organizationId),
     enabled: !!organizationId,
   });
-  const month = new Date().toISOString().slice(0, 7) + "-01";
+  const month = localMonthStartISO();
   const generate = useMutation({
     mutationFn: () => billingService.generateMonth(organizationId, month),
     onSuccess: () =>
       void queryClient.invalidateQueries({
-        queryKey: ["invoices", organizationId],
+        queryKey: queryKeys.invoices(session?.userId ?? "", organizationId),
       }),
   });
+  function confirmGeneration() {
+    Alert.alert(
+      "Generate this month’s invoices?",
+      "Existing invoices are skipped; new invoices are created for eligible active tenancies.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Generate", onPress: () => generate.mutate() },
+      ],
+    );
+  }
   return (
     <Screen>
       <View style={s.header}>
@@ -50,17 +66,27 @@ export default function RentScreen() {
       <PrimaryButton
         label={generate.isPending ? "Generating…" : "Generate monthly invoices"}
         isDisabled={generate.isPending}
-        onPress={() => generate.mutate()}
+        onPress={confirmGeneration}
       />
       {generate.data ? (
         <AppText style={{ color: colors.success, marginTop: 8 }}>
           Invoice generation completed.
         </AppText>
       ) : null}
+      {generate.isError ? (
+        <AppText
+          accessibilityRole="alert"
+          style={{ color: colors.danger, marginTop: 8 }}
+        >
+          {toUserMessage(generate.error, "Invoices could not be generated.")}
+        </AppText>
+      ) : null}
       <AppText variant="section" style={s.title}>
         Payment approvals
       </AppText>
-      {query.isError ? (
+      {query.isLoading ? (
+        <LoadingSkeleton />
+      ) : query.isError ? (
         <StateView
           kind="error"
           title="Approvals unavailable"
@@ -92,7 +118,7 @@ export default function RentScreen() {
                   {formatMoney(item.amount_paise)}
                 </AppText>
                 <AppText variant="caption" muted>
-                  {item.method.replace("_", " ")} · {item.paid_on}
+                  {item.method.replace("_", " ")} · {formatDate(item.paid_on)}
                 </AppText>
               </View>
               <StatusBadge status="review" />

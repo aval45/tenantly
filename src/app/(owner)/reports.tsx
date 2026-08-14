@@ -1,8 +1,10 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import { useState } from "react";
-import { Platform, Pressable, Share, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 import { billingService } from "@/features/billing/service";
 import { residentService } from "@/features/residents/service";
 import { getSupabaseClient } from "@/shared/api/supabase";
@@ -11,6 +13,10 @@ import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
 import { Screen } from "@/shared/components/screen";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
+import { buildCsv } from "@/shared/utils/csv";
+import { prepareDocument, removeUpload } from "@/shared/storage/uploads";
+import { queryKeys } from "@/shared/api/query-keys";
+import { toUserMessage } from "@/shared/errors/to-user-message";
 
 function downloadWeb(name: string, content: string) {
   if (typeof document === "undefined") return;
@@ -31,9 +37,10 @@ export default function ReportsScreen() {
   const [uploading, setUploading] = useState(false);
   const [residentId, setResidentId] = useState("");
   const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
   const org = session?.activeOrganizationId ?? "";
   const residents = useQuery({
-    queryKey: ["residents", org],
+    queryKey: queryKeys.residents(session?.userId ?? "", org),
     queryFn: () => residentService.list(org),
     enabled: !!org,
   });
@@ -42,25 +49,46 @@ export default function ReportsScreen() {
     (residents.data?.length === 1 ? (residents.data[0]?.id ?? "") : "");
   async function exportInvoices() {
     setExporting(true);
+    setError("");
     try {
       const invoices = await billingService.listInvoices(org);
-      const csv = [
-        "Invoice number,Period,Due date,Total paise,Paid paise,Balance paise,Status",
-        ...invoices.map((item) =>
-          [
-            item.invoice_number,
-            item.period_start,
-            item.due_date,
-            item.total_paise,
-            item.paid_paise,
-            item.balance_paise,
-            item.status,
-          ].join(","),
-        ),
-      ].join("\n");
+      const csv = buildCsv([
+        [
+          "Invoice number",
+          "Period",
+          "Due date",
+          "Total paise",
+          "Paid paise",
+          "Balance paise",
+          "Status",
+        ],
+        ...invoices.map((item) => [
+          item.invoice_number,
+          item.period_start,
+          item.due_date,
+          item.total_paise,
+          item.paid_paise,
+          item.balance_paise,
+          item.status,
+        ]),
+      ]);
       if (Platform.OS === "web") downloadWeb("tenantly-invoices.csv", csv);
-      else
-        await Share.share({ title: "Tenantly invoice export", message: csv });
+      else {
+        const uri = `${FileSystem.cacheDirectory}tenantly-invoices-${Date.now()}.csv`;
+        await FileSystem.writeAsStringAsync(uri, `\uFEFF${csv}`, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        if (!(await Sharing.isAvailableAsync()))
+          throw new Error("sharing_unavailable");
+        await Sharing.shareAsync(uri, {
+          mimeType: "text/csv",
+          dialogTitle: "Tenantly invoice export",
+        });
+      }
+    } catch (cause) {
+      setError(
+        toUserMessage(cause, "The invoice export could not be created."),
+      );
     } finally {
       setExporting(false);
     }
@@ -72,31 +100,40 @@ export default function ReportsScreen() {
     });
     if (result.canceled) return;
     setUploading(true);
+    setError("");
+    let uploadedPath: string | undefined;
     try {
       const asset = result.assets[0];
       if (!asset) return;
-      const bytes = await (await fetch(asset.uri)).arrayBuffer();
-      const extension = asset.name.split(".").pop()?.toLowerCase() ?? "pdf";
-      const path = `${org}/${session?.userId}/${Crypto.randomUUID()}.${extension}`;
+      const prepared = await prepareDocument(asset.uri, asset.mimeType);
+      uploadedPath = `${org}/${session?.userId}/${Crypto.randomUUID()}.${prepared.extension}`;
       const client = getSupabaseClient();
       const { error: uploadError } = await client.storage
         .from("resident-documents")
-        .upload(path, bytes, {
-          contentType: asset.mimeType ?? "application/pdf",
+        .upload(uploadedPath, prepared.bytes, {
+          contentType: prepared.contentType,
           upsert: false,
         });
       if (uploadError) throw uploadError;
-      const { error } = await client.from("documents").insert({
-        organization_id: org,
-        resident_id: effectiveResidentId,
-        profile_id: null,
-        document_type: "resident_document",
-        storage_path: path,
-        uploaded_by: session?.userId,
+      const { error } = await client.rpc("register_resident_document", {
+        requested_organization_id: org,
+        requested_resident_id: effectiveResidentId,
+        requested_document_type: "resident_document",
+        requested_storage_path: uploadedPath,
       });
       if (error) throw error;
       setNotice("Document uploaded privately.");
-      await cache.invalidateQueries({ queryKey: ["documents", org] });
+      await Promise.all([
+        cache.invalidateQueries({
+          queryKey: queryKeys.documents(session?.userId ?? "", org),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.tenantMore(session?.userId ?? "", org),
+        }),
+      ]);
+    } catch (cause) {
+      if (uploadedPath) await removeUpload("resident-documents", uploadedPath);
+      setError(toUserMessage(cause, "The document could not be uploaded."));
     } finally {
       setUploading(false);
     }
@@ -126,6 +163,7 @@ export default function ReportsScreen() {
             accessibilityState={{
               selected: resident.id === effectiveResidentId,
             }}
+            aria-checked={resident.id === effectiveResidentId}
             onPress={() => setResidentId(resident.id)}
             style={[
               s.choice,
@@ -162,6 +200,11 @@ export default function ReportsScreen() {
       />
       {notice ? (
         <AppText style={{ color: colors.success }}>{notice}</AppText>
+      ) : null}
+      {error ? (
+        <AppText accessibilityRole="alert" style={{ color: colors.danger }}>
+          {error}
+        </AppText>
       ) : null}
     </Screen>
   );

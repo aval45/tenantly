@@ -1,12 +1,25 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pressable, StyleSheet, View } from "react-native";
+import {
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from "react-native";
+import { useState } from "react";
 import { complaintService } from "@/features/complaints/service";
 import { useAuth } from "@/shared/auth/auth-provider";
 import type { ComplaintStatus } from "@/shared/api/database.types";
 import { AppText } from "@/shared/components/app-text";
 import { Screen } from "@/shared/components/screen";
-import { EmptyLedger } from "@/shared/components/state-views";
+import {
+  EmptyLedger,
+  LoadingSkeleton,
+  StateView,
+} from "@/shared/components/state-views";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
+import { queryKeys } from "@/shared/api/query-keys";
+import { toUserMessage } from "@/shared/errors/to-user-message";
 const next: Partial<Record<ComplaintStatus, ComplaintStatus>> = {
   open: "in_progress",
   assigned: "in_progress",
@@ -19,64 +32,118 @@ export default function ComplaintsScreen() {
   const colors = useTenantlyColors();
   const cache = useQueryClient();
   const org = session?.activeOrganizationId ?? "";
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const query = useQuery({
-    queryKey: ["complaints", org],
+    queryKey: queryKeys.complaints(session?.userId ?? "", org),
     queryFn: () => complaintService.list(org),
     enabled: !!org,
   });
   async function advance(id: string, status: ComplaintStatus) {
     const value = next[status];
     if (!value) return;
-    await complaintService.transition(id, value);
-    await cache.invalidateQueries({ queryKey: ["complaints", org] });
+    setBusyId(id);
+    setActionError(null);
+    try {
+      await complaintService.transition(id, value);
+      await cache.invalidateQueries({
+        queryKey: queryKeys.complaints(session?.userId ?? "", org),
+      });
+    } catch (cause) {
+      setActionError(
+        toUserMessage(cause, "The request status could not be updated."),
+      );
+    } finally {
+      setBusyId(null);
+    }
   }
-  return (
-    <Screen>
-      <View style={s.header}>
-        <AppText variant="heading">Complaints</AppText>
-        <AppText muted>
-          Triage and progress resident requests with an auditable history.
-        </AppText>
-      </View>
-      {!query.isLoading && !query.data?.length ? (
-        <EmptyLedger
-          title="No open requests"
-          body="Resident maintenance and service requests will appear here."
+  if (query.isLoading)
+    return (
+      <Screen>
+        <LoadingSkeleton />
+      </Screen>
+    );
+  if (query.isError)
+    return (
+      <Screen>
+        <StateView
+          kind="error"
+          title="Requests unavailable"
+          body="Resident requests could not be loaded."
+          actionLabel="Retry"
+          onAction={() => void query.refetch()}
         />
-      ) : (
-        <View style={[s.list, { borderColor: colors.border }]}>
-          {query.data?.map((item) => (
-            <View
-              key={item.id}
-              style={[s.row, { borderBottomColor: colors.border }]}
-            >
-              <View style={{ flex: 1, gap: 3 }}>
-                <AppText variant="label">{item.title}</AppText>
-                <AppText variant="caption" muted>
-                  {item.category} · {item.priority} ·{" "}
-                  {item.status.replace("_", " ")}
-                </AppText>
-              </View>
-              {next[item.status] ? (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => void advance(item.id, item.status)}
-                  style={[s.action, { backgroundColor: colors.primarySoft }]}
-                >
-                  <AppText variant="caption">
-                    Mark {next[item.status]?.replace("_", " ")}
-                  </AppText>
-                </Pressable>
-              ) : null}
+      </Screen>
+    );
+  return (
+    <Screen scrollable={false}>
+      <FlatList
+        data={query.data ?? []}
+        keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl
+            refreshing={query.isRefetching}
+            onRefresh={() => void query.refetch()}
+          />
+        }
+        contentContainerStyle={s.content}
+        ListHeaderComponent={
+          <>
+            <View style={s.header}>
+              <AppText variant="heading">Complaints</AppText>
+              <AppText muted>
+                Triage and progress resident requests with an auditable history.
+              </AppText>
             </View>
-          ))}
-        </View>
-      )}
+            {actionError ? (
+              <AppText
+                accessibilityRole="alert"
+                style={{ color: colors.danger, marginBottom: spacing.md }}
+              >
+                {actionError}
+              </AppText>
+            ) : null}
+          </>
+        }
+        ListEmptyComponent={
+          <EmptyLedger
+            title="No open requests"
+            body="Resident maintenance and service requests will appear here."
+          />
+        }
+        renderItem={({ item }) => (
+          <View style={[s.row, { borderColor: colors.border }]}>
+            <View style={{ flex: 1, gap: 3 }}>
+              <AppText variant="label">{item.title}</AppText>
+              <AppText variant="caption" muted>
+                {item.category} · {item.priority} ·{" "}
+                {item.status.replace("_", " ")}
+              </AppText>
+            </View>
+            {next[item.status] ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: busyId === item.id }}
+                disabled={busyId === item.id}
+                onPress={() => void advance(item.id, item.status)}
+                style={[s.action, { backgroundColor: colors.primarySoft }]}
+              >
+                <AppText variant="caption">
+                  {busyId === item.id
+                    ? "Updating…"
+                    : `Mark ${next[item.status]?.replace("_", " ")}`}
+                </AppText>
+              </Pressable>
+            ) : null}
+          </View>
+        )}
+      />
     </Screen>
   );
 }
 const s = StyleSheet.create({
   header: { gap: 5, paddingVertical: spacing.lg },
+  content: { paddingBottom: spacing.xl },
   list: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: radii.card,
@@ -88,7 +155,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     padding: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radii.card,
+    marginBottom: 8,
   },
   action: {
     minHeight: 40,

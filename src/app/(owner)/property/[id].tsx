@@ -7,16 +7,21 @@ import { roomService } from "@/features/properties/rooms";
 import { useAuth } from "@/shared/auth/auth-provider";
 import { AppText } from "@/shared/components/app-text";
 import { Screen } from "@/shared/components/screen";
-import { LoadingSkeleton } from "@/shared/components/state-views";
+import { LoadingSkeleton, StateView } from "@/shared/components/state-views";
 import { formatMoney } from "@/shared/utils/money";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
+import { queryKeys } from "@/shared/api/query-keys";
 export default function PropertyDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const colors = useTenantlyColors();
   const { session } = useAuth();
   const query = useQuery({
-    queryKey: ["property", id],
+    queryKey: queryKeys.property(
+      session?.userId ?? "",
+      session?.activeOrganizationId ?? "",
+      id,
+    ),
     queryFn: async () =>
       Promise.all([
         propertyService.get(session?.activeOrganizationId ?? "", id),
@@ -28,6 +33,18 @@ export default function PropertyDetail() {
     return (
       <Screen>
         <LoadingSkeleton />
+      </Screen>
+    );
+  if (query.isError)
+    return (
+      <Screen>
+        <StateView
+          kind="error"
+          title="Property unavailable"
+          body="Property and room details could not be loaded."
+          actionLabel="Retry"
+          onAction={() => void query.refetch()}
+        />
       </Screen>
     );
   const property = query.data?.[0];
@@ -63,7 +80,11 @@ export default function PropertyDetail() {
     <Screen>
       <Pressable
         accessibilityRole="button"
-        onPress={() => router.replace("/(owner)/properties" as never)}
+        onPress={() =>
+          router.canGoBack()
+            ? router.back()
+            : router.replace("/(owner)/properties" as never)
+        }
         style={s.back}
       >
         <ArrowLeft size={20} color={colors.primary} />

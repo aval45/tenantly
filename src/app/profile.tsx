@@ -7,11 +7,13 @@ import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
 import { Screen } from "@/shared/components/screen";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
+import { toUserMessage } from "@/shared/errors/to-user-message";
 export default function ProfileRoute() {
   const { status } = useAuth();
   if (status === "unconfigured")
     return <Redirect href={"/configuration-required" as never} />;
   if (status === "restoring") return null;
+  if (status === "error") return <Redirect href="/" />;
   if (status === "unauthenticated") return <Redirect href="/(auth)/login" />;
   return <ProfileScreen />;
 }
@@ -20,19 +22,28 @@ function ProfileScreen() {
   const { session, refreshSession } = useAuth();
   const colors = useTenantlyColors();
   const [name, setName] = useState(session?.profile.fullName ?? "");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(session?.profile.phone ?? "");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
   async function save() {
+    const normalizedPhone = phone.trim();
+    if (normalizedPhone && !/^\+?[0-9]{10,15}$/.test(normalizedPhone)) {
+      setError("Enter a valid phone number with country code.");
+      return;
+    }
     setSaving(true);
+    setError("");
     try {
       const { error } = await getSupabaseClient()
         .from("profiles")
-        .update({ full_name: name, phone_e164: phone || null })
+        .update({ full_name: name.trim(), phone_e164: normalizedPhone || null })
         .eq("id", session?.userId ?? "");
       if (error) throw error;
       await refreshSession();
       setNotice("Profile updated.");
+    } catch (cause) {
+      setError(toUserMessage(cause, "Your profile could not be updated."));
     } finally {
       setSaving(false);
     }
@@ -80,6 +91,11 @@ function ProfileScreen() {
       </View>
       {notice ? (
         <AppText style={{ color: colors.success }}>{notice}</AppText>
+      ) : null}
+      {error ? (
+        <AppText accessibilityRole="alert" style={{ color: colors.danger }}>
+          {error}
+        </AppText>
       ) : null}
       <PrimaryButton
         label={saving ? "Saving…" : "Save profile"}

@@ -9,13 +9,19 @@ import { formatMoney } from "@/shared/utils/money";
 import { motion } from "@/shared/theme/motion";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
 import { useAppContextStore } from "@/stores/app-context";
+import { queryKeys } from "@/shared/api/query-keys";
+import { formatDate } from "@/shared/utils/date";
+import { LoadingSkeleton, StateView } from "@/shared/components/state-views";
 export default function TenantMore() {
   const { session, signOut } = useAuth();
   const colors = useTenantlyColors();
   const theme = useAppContextStore((s) => s.theme);
   const setTheme = useAppContextStore((s) => s.setTheme);
   const query = useQuery({
-    queryKey: ["tenant-more", session?.userId],
+    queryKey: queryKeys.tenantMore(
+      session?.userId ?? "",
+      session?.activeOrganizationId ?? "",
+    ),
     queryFn: async () => {
       const context = await getTenantContext();
       const { data: documents, error } = await getSupabaseClient()
@@ -34,6 +40,24 @@ export default function TenantMore() {
     await Linking.openURL(data.signedUrl);
   }
   const tenancy = query.data?.context.tenancy;
+  if (query.isLoading)
+    return (
+      <Screen>
+        <LoadingSkeleton />
+      </Screen>
+    );
+  if (query.isError)
+    return (
+      <Screen>
+        <StateView
+          kind="error"
+          title="Account details unavailable"
+          body="Your tenancy and documents could not be loaded."
+          actionLabel="Retry"
+          onAction={() => void query.refetch()}
+        />
+      </Screen>
+    );
   return (
     <Screen>
       <View style={s.header}>
@@ -48,7 +72,9 @@ export default function TenantMore() {
       <View style={[s.card, { borderColor: colors.border }]}>
         {tenancy ? (
           <>
-            <AppText variant="label">Active since {tenancy.start_date}</AppText>
+            <AppText variant="label">
+              Active since {formatDate(tenancy.start_date)}
+            </AppText>
             <AppText muted>
               Monthly rent {formatMoney(tenancy.rent_paise)} · due day{" "}
               {tenancy.due_day}
@@ -93,11 +119,12 @@ export default function TenantMore() {
         Appearance
       </AppText>
       <View style={s.row}>
-        {(["light", "dark"] as const).map((item) => (
+        {(["system", "light", "dark"] as const).map((item) => (
           <Pressable
             key={item}
             accessibilityRole="radio"
             accessibilityState={{ selected: theme === item }}
+            aria-checked={theme === item}
             onPress={() => setTheme(item)}
             style={({ pressed }) => [
               s.choice,

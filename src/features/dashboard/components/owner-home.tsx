@@ -20,8 +20,10 @@ import { LoadingSkeleton, StateView } from "@/shared/components/state-views";
 import { StatusBadge } from "@/shared/components/status-badge";
 import { useAuth } from "@/shared/auth/auth-provider";
 import { getSupabaseClient } from "@/shared/api/supabase";
+import { queryKeys } from "@/shared/api/query-keys";
 import { copy } from "@/shared/i18n/en";
 import { formatCompactMoney, formatMoney } from "@/shared/utils/money";
+import { currentMonthLabel, formatDate } from "@/shared/utils/date";
 import { motion } from "@/shared/theme/motion";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
 
@@ -76,7 +78,7 @@ function CollectionSummary({
           borderTopColor: colors.accent,
         },
       ]}
-      accessibilityLabel={`${copy.home.collection}: ${formatMoney(data.collectedPaise)} of ${formatMoney(data.expectedPaise)} collected`}
+      accessibilityLabel={`${currentMonthLabel()} collection: ${formatMoney(data.collectedPaise)} of ${formatMoney(data.expectedPaise)} collected`}
     >
       <View style={styles.collectionTop}>
         <View>
@@ -84,7 +86,7 @@ function CollectionSummary({
             MONTHLY RENT BOOK
           </AppText>
           <AppText variant="caption" muted>
-            {copy.home.collection}
+            {currentMonthLabel()} collection
           </AppText>
         </View>
         <View
@@ -139,7 +141,7 @@ function CollectionSummary({
             Outstanding
           </AppText>
           <AppText variant="label">
-            {formatCompactMoney(data.expectedPaise - data.collectedPaise)}
+            {formatCompactMoney(data.outstandingPaise)}
           </AppText>
         </View>
         <Pressable
@@ -264,9 +266,13 @@ export function OwnerHomeScreen() {
     organizationId,
     undefined,
     session?.profile.fullName,
+    session?.userId,
   );
   const unreadNotifications = useQuery({
-    queryKey: ["notifications", session?.userId, "unread-count"],
+    queryKey: [
+      ...queryKeys.notifications(session?.userId ?? ""),
+      "unread-count",
+    ],
     queryFn: async () => {
       const { count, error } = await getSupabaseClient()
         .from("notifications")
@@ -314,7 +320,12 @@ export function OwnerHomeScreen() {
   }
 
   const data = query.data;
+  const firstAttention = data.attention[0];
   const goToRent = () => router.push("/rent");
+  const goToAttention = (item: (typeof data.attention)[number]) =>
+    item.kind === "complaint"
+      ? router.push("/(owner)/complaints" as never)
+      : goToRent();
   return (
     <Screen
       testID="owner-home-populated"
@@ -337,11 +348,11 @@ export function OwnerHomeScreen() {
           </View>
           <AppText variant="heading">Rent register</AppText>
           <AppText muted>
-            {new Intl.DateTimeFormat("en-IN", {
+            {formatDate(new Date(), {
               weekday: "long",
               day: "numeric",
               month: "long",
-            }).format(new Date())}{" "}
+            })}{" "}
             · managed by {data.ownerFirstName}
           </AppText>
         </View>
@@ -383,7 +394,9 @@ export function OwnerHomeScreen() {
       </View>
       <SectionHeader
         title={copy.home.needsAttention}
-        action={data.attention.length ? goToRent : undefined}
+        action={
+          firstAttention ? () => goToAttention(firstAttention) : undefined
+        }
       />
       {data.attention.length ? (
         <View
@@ -393,7 +406,11 @@ export function OwnerHomeScreen() {
           ]}
         >
           {data.attention.map((item) => (
-            <AttentionRow key={item.id} item={item} onPress={goToRent} />
+            <AttentionRow
+              key={item.id}
+              item={item}
+              onPress={() => goToAttention(item)}
+            />
           ))}
         </View>
       ) : (

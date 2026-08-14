@@ -18,7 +18,7 @@ export const copy = {
   home: {
     greeting: "Morning",
     overview: "A clear view of operations today.",
-    collection: "July collection",
+    collection: "Monthly collection",
     collected: "collected",
     expected: "expected",
     reviewPayments: "Review payments",

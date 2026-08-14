@@ -7,10 +7,18 @@ import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { complaintService } from "@/features/complaints/service";
 import { getTenantContext } from "@/features/tenant/api";
 import { getSupabaseClient } from "@/shared/api/supabase";
+import { queryKeys } from "@/shared/api/query-keys";
 import { useAuth } from "@/shared/auth/auth-provider";
 import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
 import { Screen } from "@/shared/components/screen";
+import {
+  EmptyLedger,
+  LoadingSkeleton,
+  StateView,
+} from "@/shared/components/state-views";
+import { toUserMessage } from "@/shared/errors/to-user-message";
+import { prepareProofImage, removeUpload } from "@/shared/storage/uploads";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
 export default function TenantRequests() {
   const { session } = useAuth();
@@ -19,9 +27,13 @@ export default function TenantRequests() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [asset, setAsset] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const query = useQuery({
-    queryKey: ["tenant-requests"],
+    queryKey: queryKeys.complaints(
+      session?.userId ?? "",
+      session?.activeOrganizationId ?? "",
+    ),
     queryFn: async () => ({
       context: await getTenantContext(),
       complaints: await complaintService.list(),
@@ -29,7 +41,10 @@ export default function TenantRequests() {
   });
   async function pickAttachment() {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) return;
+    if (!permission.granted) {
+      setError("Photo access is required to attach an image.");
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.8,
@@ -40,8 +55,23 @@ export default function TenantRequests() {
     const context = query.data?.context;
     if (!context?.tenancy) return;
     setSaving(true);
+    setError(null);
+    let uploadedPath: string | null = null;
     try {
-      const complaintId = await complaintService.create({
+      let mediaType: string | undefined;
+      if (asset) {
+        const prepared = await prepareProofImage(asset);
+        uploadedPath = `${context.resident.organization_id}/${session?.userId}/${Crypto.randomUUID()}.${prepared.extension}`;
+        mediaType = prepared.contentType;
+        const { error: uploadError } = await getSupabaseClient()
+          .storage.from("complaint-attachments")
+          .upload(uploadedPath, prepared.bytes, {
+            contentType: prepared.contentType,
+            upsert: false,
+          });
+        if (uploadError) throw uploadError;
+      }
+      await complaintService.create({
         organizationId: context.resident.organization_id,
         residentId: context.resident.id,
         tenancyId: context.tenancy.id,
@@ -50,32 +80,22 @@ export default function TenantRequests() {
         title,
         description,
         priority: "normal",
+        storagePath: uploadedPath ?? undefined,
+        mediaType,
       });
-      if (asset) {
-        const path = `${context.resident.organization_id}/${session?.userId}/${Crypto.randomUUID()}.jpg`;
-        const bytes = await (await fetch(asset.uri)).arrayBuffer();
-        const client = getSupabaseClient();
-        const { error: uploadError } = await client.storage
-          .from("complaint-attachments")
-          .upload(path, bytes, {
-            contentType: asset.mimeType ?? "image/jpeg",
-            upsert: false,
-          });
-        if (uploadError) throw uploadError;
-        const { error } = await client.from("attachments").insert({
-          organization_id: context.resident.organization_id,
-          entity_type: "complaint",
-          entity_id: complaintId,
-          storage_path: path,
-          media_type: asset.mimeType ?? "image/jpeg",
-          uploaded_by: session?.userId,
-        });
-        if (error) throw error;
-      }
       setTitle("");
       setDescription("");
       setAsset(null);
-      await cache.invalidateQueries({ queryKey: ["tenant-requests"] });
+      await cache.invalidateQueries({
+        queryKey: queryKeys.complaints(
+          session?.userId ?? "",
+          session?.activeOrganizationId ?? "",
+        ),
+      });
+    } catch (cause) {
+      if (uploadedPath)
+        await removeUpload("complaint-attachments", uploadedPath);
+      setError(toUserMessage(cause, "Request could not be submitted."));
     } finally {
       setSaving(false);
     }
@@ -135,9 +155,30 @@ export default function TenantRequests() {
         }
         onPress={() => void create()}
       />
+      {error ? (
+        <AppText accessibilityRole="alert" style={{ color: colors.danger }}>
+          {error}
+        </AppText>
+      ) : null}
       <AppText variant="section" style={s.section}>
         Your requests
       </AppText>
+      {query.isLoading ? <LoadingSkeleton /> : null}
+      {query.isError ? (
+        <StateView
+          kind="error"
+          title="Requests unavailable"
+          body="We could not load your requests."
+          actionLabel="Retry"
+          onAction={() => void query.refetch()}
+        />
+      ) : null}
+      {!query.isLoading && !query.isError && !query.data?.complaints.length ? (
+        <EmptyLedger
+          title="No requests yet"
+          body="Submitted maintenance requests will appear here."
+        />
+      ) : null}
       {query.data?.complaints.map((item) => (
         <View key={item.id} style={[s.item, { borderColor: colors.border }]}>
           <AppText variant="label">{item.title}</AppText>

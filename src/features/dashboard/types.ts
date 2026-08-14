@@ -19,7 +19,7 @@ export type ActivityItem = {
   personName: string;
   description: string;
   amountPaise?: number;
-  status: "paid" | "review";
+  status: "paid" | "review" | "rejected" | "refunded";
   occurredAtLabel: string;
 };
 

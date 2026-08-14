@@ -11,6 +11,10 @@ import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
 import { Screen } from "@/shared/components/screen";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
+import { queryKeys } from "@/shared/api/query-keys";
+import { localDateISO } from "@/shared/utils/date";
+import { toUserMessage } from "@/shared/errors/to-user-message";
+import * as Crypto from "expo-crypto";
 
 function Choices({
   title,
@@ -33,6 +37,7 @@ function Choices({
             key={item.id}
             accessibilityRole="radio"
             accessibilityState={{ selected: item.id === value }}
+            aria-checked={item.id === value}
             onPress={() => onChange(item.id)}
             style={[
               s.choice,
@@ -65,26 +70,37 @@ export default function TenancySetup() {
   const [dueDay, setDueDay] = useState("5");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [idempotencyKey] = useState(
+    () => `tenancy-${residentId}-${Crypto.randomUUID()}`,
+  );
   const properties = useQuery({
-    queryKey: ["properties", org],
+    queryKey: queryKeys.properties(session?.userId ?? "", org),
     queryFn: () => propertyService.list(org),
     enabled: !!org,
   });
   const rooms = useQuery({
-    queryKey: ["rooms", propertyId],
+    queryKey: queryKeys.rooms(session?.userId ?? "", org, propertyId),
     queryFn: () => roomService.listForProperty(propertyId),
     enabled: !!propertyId,
   });
   const beds = useQuery({
-    queryKey: ["beds", roomId],
+    queryKey: queryKeys.beds(session?.userId ?? "", org, roomId),
     queryFn: async () => {
-      const { data, error } = await getSupabaseClient()
+      const client = getSupabaseClient();
+      const { data, error } = await client
         .from("beds")
         .select("*")
         .eq("room_id", roomId)
         .eq("status", "active");
       if (error) throw error;
-      return data;
+      const { data: occupied, error: occupiedError } = await client
+        .from("occupancy_assignments")
+        .select("bed_id")
+        .eq("room_id", roomId)
+        .is("ends_at", null);
+      if (occupiedError) throw occupiedError;
+      const occupiedIds = new Set(occupied.map((item) => item.bed_id));
+      return data.filter((item) => !occupiedIds.has(item.id));
     },
     enabled: !!roomId,
   });
@@ -98,17 +114,15 @@ export default function TenancySetup() {
         propertyId,
         roomId,
         bedId,
-        startDate: new Date().toISOString().slice(0, 10),
+        startDate: localDateISO(),
         dueDay: Number(dueDay),
         rentPaise: Math.round(Number(rent) * 100),
         depositPaise: Math.round(Number(deposit) * 100),
-        idempotencyKey: `tenancy-${residentId}-${Date.now()}`,
+        idempotencyKey,
       });
       router.back();
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Could not create tenancy.",
-      );
+      setError(toUserMessage(cause, "Could not create tenancy."));
     } finally {
       setSaving(false);
     }
@@ -136,10 +150,12 @@ export default function TenancySetup() {
       />
       <Choices
         title="Room"
-        items={(rooms.data ?? []).map((item) => ({
-          id: item.id,
-          label: item.code,
-        }))}
+        items={(rooms.data ?? [])
+          .filter((item) => item.occupiedBeds < item.bedCount)
+          .map((item) => ({
+            id: item.id,
+            label: item.code,
+          }))}
         value={roomId}
         onChange={(value) => {
           setRoomId(value);
