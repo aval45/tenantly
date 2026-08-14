@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { Eye, EyeOff } from "lucide-react-native";
 import {
   KeyboardAvoidingView,
   Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -43,6 +46,10 @@ export function AuthFormScreen({
   const colors = useTenantlyColors();
   const [values, setValues] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [visibleFields, setVisibleFields] = useState<Record<string, boolean>>(
+    {},
+  );
+  const inputRefs = useRef<Record<string, TextInput | null>>({});
   async function submit() {
     setSubmitting(true);
     try {
@@ -57,7 +64,11 @@ export function AuthFormScreen({
         style={styles.safe}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <View style={styles.page}>
+        <ScrollView
+          contentContainerStyle={styles.page}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
+        >
           <View style={styles.brandLine}>
             <BrandMark />
             <View style={styles.wordmark}>
@@ -72,33 +83,76 @@ export function AuthFormScreen({
           <AppText variant="display">{title}</AppText>
           <AppText muted>{body}</AppText>
           <View style={styles.form}>
-            {fields.map((field) => (
+            {fields.map((field, index) => (
               <View key={field.name} style={styles.field}>
                 <AppText variant="label">{field.label}</AppText>
-                <TextInput
-                  accessibilityLabel={field.label}
-                  autoCapitalize={
-                    field.keyboardType === "email-address" ? "none" : "words"
-                  }
-                  autoComplete={field.autoComplete}
-                  keyboardType={field.keyboardType}
-                  secureTextEntry={field.secureTextEntry}
-                  value={values[field.name] ?? ""}
-                  onChangeText={(value) =>
-                    setValues((current) => ({
-                      ...current,
-                      [field.name]: value,
-                    }))
-                  }
+                <View
                   style={[
-                    styles.input,
+                    styles.inputShell,
                     {
-                      color: colors.text,
                       borderColor: colors.border,
                       backgroundColor: colors.surfaceRaised,
                     },
                   ]}
-                />
+                >
+                  <TextInput
+                    ref={(ref) => {
+                      inputRefs.current[field.name] = ref;
+                    }}
+                    accessibilityLabel={field.label}
+                    autoCapitalize={
+                      field.keyboardType === "email-address"
+                        ? "none"
+                        : field.secureTextEntry
+                          ? "none"
+                          : "words"
+                    }
+                    autoComplete={field.autoComplete}
+                    keyboardType={field.keyboardType}
+                    secureTextEntry={
+                      field.secureTextEntry && !visibleFields[field.name]
+                    }
+                    returnKeyType={
+                      index === fields.length - 1 ? "done" : "next"
+                    }
+                    onSubmitEditing={() => {
+                      const next = fields[index + 1];
+                      if (next) inputRefs.current[next.name]?.focus();
+                      else void submit();
+                    }}
+                    value={values[field.name] ?? ""}
+                    onChangeText={(value) =>
+                      setValues((current) => ({
+                        ...current,
+                        [field.name]: value,
+                      }))
+                    }
+                    style={[styles.input, { color: colors.text }]}
+                  />
+                  {field.secureTextEntry ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        visibleFields[field.name]
+                          ? `Hide ${field.label}`
+                          : `Show ${field.label}`
+                      }
+                      onPress={() =>
+                        setVisibleFields((current) => ({
+                          ...current,
+                          [field.name]: !current[field.name],
+                        }))
+                      }
+                      style={styles.visibility}
+                    >
+                      {visibleFields[field.name] ? (
+                        <EyeOff size={20} color={colors.textMuted} />
+                      ) : (
+                        <Eye size={20} color={colors.textMuted} />
+                      )}
+                    </Pressable>
+                  ) : null}
+                </View>
               </View>
             ))}
             {error ? (
@@ -124,7 +178,7 @@ export function AuthFormScreen({
             />
           </View>
           <View style={styles.footer}>{footer}</View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -132,7 +186,7 @@ export function AuthFormScreen({
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   page: {
-    flex: 1,
+    flexGrow: 1,
     width: "100%",
     maxWidth: 520,
     alignSelf: "center",
@@ -150,13 +204,25 @@ const styles = StyleSheet.create({
   form: { gap: spacing.md, marginTop: spacing.lg },
   field: { gap: 7 },
   input: {
+    flex: 1,
     minHeight: 52,
-    borderWidth: 1,
-    borderLeftWidth: 3,
-    borderRadius: radii.control,
     paddingHorizontal: 14,
     fontFamily: "Inter_400Regular",
     fontSize: 16,
+  },
+  inputShell: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderLeftWidth: 3,
+    borderRadius: radii.control,
+  },
+  visibility: {
+    width: 48,
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
   },
   footer: {
     minHeight: 48,

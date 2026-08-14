@@ -20,7 +20,7 @@ import { queryClient } from "@/shared/api/query-client";
 import { AuthProvider } from "@/shared/auth/auth-provider";
 import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
-import { useTenantlyColors } from "@/shared/theme/tokens";
+import { useResolvedTheme, useTenantlyColors } from "@/shared/theme/tokens";
 import { copy } from "@/shared/i18n/en";
 import { useAppContextStore } from "@/stores/app-context";
 import { PushRegistration } from "@/features/notifications/push-registration";
@@ -51,6 +51,7 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
 
 export default function RootLayout() {
   const theme = useAppContextStore((state) => state.theme);
+  const resolvedTheme = useResolvedTheme();
   const navigationAnimation = useNavigationAnimation();
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
@@ -75,7 +76,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <PushRegistration />
-            <StatusBar style={theme === "dark" ? "light" : "dark"} />
+            <StatusBar style={resolvedTheme === "dark" ? "light" : "dark"} />
             <Stack
               screenOptions={{
                 headerShown: false,

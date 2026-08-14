@@ -11,8 +11,8 @@ type StateViewProps = {
   kind: "empty" | "error";
   title: string;
   body: string;
-  actionLabel: string;
-  onAction(): void;
+  actionLabel?: string;
+  onAction?(): void;
 };
 
 export function StateView({
@@ -47,11 +47,13 @@ export function StateView({
       <AppText muted style={styles.center}>
         {body}
       </AppText>
-      <PrimaryButton
-        label={actionLabel}
-        onPress={onAction}
-        style={styles.action}
-      />
+      {actionLabel && onAction ? (
+        <PrimaryButton
+          label={actionLabel}
+          onPress={onAction}
+          style={styles.action}
+        />
+      ) : null}
     </View>
   );
 }

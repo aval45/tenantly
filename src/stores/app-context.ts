@@ -1,18 +1,37 @@
 import { create } from "zustand";
+import {
+  createJSONStorage,
+  persist,
+  type StateStorage,
+} from "zustand/middleware";
+import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 
-export type AppTheme = "light" | "dark";
+export type AppTheme = "system" | "light" | "dark";
 
 type AppContextState = {
-  activeOrganizationId: string | null;
   theme: AppTheme;
-  setActiveOrganizationId(value: string | null): void;
   setTheme(value: AppTheme): void;
 };
 
-export const useAppContextStore = create<AppContextState>((set) => ({
-  activeOrganizationId: null,
-  theme: "light",
-  setActiveOrganizationId: (activeOrganizationId) =>
-    set({ activeOrganizationId }),
-  setTheme: (theme) => set({ theme }),
-}));
+const storage: StateStorage = {
+  getItem: (name) =>
+    Platform.OS === "web"
+      ? (globalThis.localStorage?.getItem(name) ?? null)
+      : SecureStore.getItemAsync(name),
+  setItem: (name, value) =>
+    Platform.OS === "web"
+      ? globalThis.localStorage?.setItem(name, value)
+      : SecureStore.setItemAsync(name, value),
+  removeItem: (name) =>
+    Platform.OS === "web"
+      ? globalThis.localStorage?.removeItem(name)
+      : SecureStore.deleteItemAsync(name),
+};
+
+export const useAppContextStore = create<AppContextState>()(
+  persist((set) => ({ theme: "system", setTheme: (theme) => set({ theme }) }), {
+    name: "tenantly.appearance",
+    storage: createJSONStorage(() => storage),
+  }),
+);

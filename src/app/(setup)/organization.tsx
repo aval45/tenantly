@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "expo-router";
@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -34,6 +35,7 @@ export default function OrganizationSetupScreen() {
   const colors = useTenantlyColors();
   const router = useRouter();
   const { completeOwnerSetup, signOut } = useAuth();
+  const slugRef = useRef<TextInput>(null);
   const {
     control,
     handleSubmit,
@@ -57,7 +59,11 @@ export default function OrganizationSetupScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.safe}
       >
-        <View style={styles.page}>
+        <ScrollView
+          automaticallyAdjustKeyboardInsets
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.page}
+        >
           <View style={styles.header}>
             <BrandMark compact />
             <AppText variant="section">Tenantly</AppText>
@@ -96,6 +102,8 @@ export default function OrganizationSetupScreen() {
                     accessibilityLabel="Workspace name"
                     autoCapitalize="words"
                     autoComplete="organization"
+                    returnKeyType="next"
+                    onSubmitEditing={() => slugRef.current?.focus()}
                     onBlur={onBlur}
                     onChangeText={onChange}
                     placeholder="e.g. Greenwood Living"
@@ -140,9 +148,12 @@ export default function OrganizationSetupScreen() {
                       tenantly.app/
                     </AppText>
                     <TextInput
+                      ref={slugRef}
                       accessibilityLabel="Workspace address"
                       autoCapitalize="none"
                       autoCorrect={false}
+                      returnKeyType="done"
+                      onSubmitEditing={() => void handleSubmit(onSubmit)()}
                       onBlur={onBlur}
                       onChangeText={(text) =>
                         onChange(text.toLowerCase().replace(/\s+/g, "-"))
@@ -178,7 +189,7 @@ export default function OrganizationSetupScreen() {
               <ArrowRight size={16} color={colors.primary} aria-hidden />
             </Pressable>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

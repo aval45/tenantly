@@ -19,8 +19,13 @@ import { spacing, useTenantlyColors } from "@/shared/theme/tokens";
 export function Screen({
   children,
   refreshControl,
+  scrollable = true,
   testID,
-}: PropsWithChildren<{ refreshControl?: ReactNode; testID?: string }>) {
+}: PropsWithChildren<{
+  refreshControl?: ReactNode;
+  scrollable?: boolean;
+  testID?: string;
+}>) {
   const colors = useTenantlyColors();
   const pathname = usePathname();
   const router = useRouter();
@@ -66,8 +71,33 @@ export function Screen({
   const destination = dynamicDestination ?? destinations[pathname];
   const showBack =
     !primaryRoutes.has(pathname) && !pathname.startsWith("/property/");
-  const goBack = () =>
-    router.replace((destination?.href ?? roleGroup) as never);
+  const goBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace((destination?.href ?? roleGroup) as never);
+  };
+  const content = (
+    <View style={[styles.content, !scrollable && styles.staticContent]}>
+      {showBack ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+          hitSlop={8}
+          onPress={goBack}
+          style={({ pressed }) => [
+            styles.back,
+            {
+              backgroundColor: colors.surfaceSubtle,
+              opacity: pressed ? motion.pressedOpacity : 1,
+            },
+          ]}
+        >
+          <ArrowLeft size={18} color={colors.primary} />
+          <AppText variant="caption">{destination?.label ?? "Back"}</AppText>
+        </Pressable>
+      ) : null}
+      {children}
+    </View>
+  );
   return (
     <SafeAreaView
       edges={["top"]}
@@ -82,40 +112,30 @@ export function Screen({
           style={[styles.brandRuleAccent, { backgroundColor: colors.accent }]}
         />
       </View>
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingHorizontal: horizontalPadding },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={refreshControl as never}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.content}>
-          {showBack ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Go back"
-              hitSlop={8}
-              onPress={goBack}
-              style={({ pressed }) => [
-                styles.back,
-                {
-                  backgroundColor: colors.surfaceSubtle,
-                  opacity: pressed ? motion.pressedOpacity : 1,
-                },
-              ]}
-            >
-              <ArrowLeft size={18} color={colors.primary} />
-              <AppText variant="caption">
-                {destination?.label ?? "Back"}
-              </AppText>
-            </Pressable>
-          ) : null}
-          {children}
+      {scrollable ? (
+        <ScrollView
+          automaticallyAdjustKeyboardInsets
+          contentInsetAdjustmentBehavior="automatic"
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingHorizontal: horizontalPadding },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={refreshControl as never}
+          showsVerticalScrollIndicator={false}
+        >
+          {content}
+        </ScrollView>
+      ) : (
+        <View
+          style={[
+            styles.nonScrollingContent,
+            { paddingHorizontal: horizontalPadding },
+          ]}
+        >
+          {content}
         </View>
-      </ScrollView>
+      )}
       {showTaskbar ? <NavigationBar /> : null}
     </SafeAreaView>
   );
@@ -133,6 +153,8 @@ const styles = StyleSheet.create({
   brandRuleAccent: { width: 68 },
   scrollContent: { flexGrow: 1, paddingBottom: 48 },
   content: { width: "100%", maxWidth: 880, alignSelf: "center" },
+  staticContent: { flex: 1 },
+  nonScrollingContent: { flex: 1, paddingBottom: 16 },
   back: {
     alignSelf: "flex-start",
     minHeight: 44,

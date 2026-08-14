@@ -1,4 +1,5 @@
 import { useAppContextStore } from "@/stores/app-context";
+import { useColorScheme } from "react-native";
 
 export const lightColors = {
   background: "#F3EFE4",
@@ -6,15 +7,15 @@ export const lightColors = {
   surfaceSubtle: "#E8E1D2",
   surfaceRaised: "#FFFDF7",
   text: "#142F35",
-  textMuted: "#647174",
+  textMuted: "#566568",
   hero: "#12363C",
   heroText: "#FFF8E8",
   heroMuted: "#BCD0CC",
   primary: "#12363C",
   primarySoft: "#D5E3DF",
   secondary: "#31545A",
-  accent: "#DF593E",
-  accentPressed: "#BC432E",
+  accent: "#B93F2D",
+  accentPressed: "#963323",
   accentSoft: "#F5D7CC",
   border: "#CFC6B5",
   success: "#277157",
@@ -66,5 +67,13 @@ export const touchTarget = { ios: 44, android: 48 } as const;
 
 export function useTenantlyColors() {
   const theme = useAppContextStore((state) => state.theme);
-  return theme === "dark" ? darkColors : lightColors;
+  const systemTheme = useColorScheme();
+  const resolved = theme === "system" ? (systemTheme ?? "light") : theme;
+  return resolved === "dark" ? darkColors : lightColors;
+}
+
+export function useResolvedTheme() {
+  const theme = useAppContextStore((state) => state.theme);
+  const systemTheme = useColorScheme();
+  return theme === "system" ? (systemTheme ?? "light") : theme;
 }

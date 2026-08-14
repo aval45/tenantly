@@ -1,11 +1,5 @@
 import type { PropsWithChildren } from "react";
-import {
-  Platform,
-  StyleSheet,
-  Text,
-  type TextProps,
-  type TextStyle,
-} from "react-native";
+import { StyleSheet, Text, type TextProps, type TextStyle } from "react-native";
 
 import { useTenantlyColors } from "@/shared/theme/tokens";
 
@@ -21,34 +15,19 @@ type TextVariant =
 
 const variants = StyleSheet.create<Record<TextVariant, TextStyle>>({
   display: {
-    fontFamily: Platform.select({
-      ios: "Georgia-Bold",
-      android: "serif",
-      web: "Georgia, serif",
-    }),
-    fontWeight: "700",
+    fontFamily: "Inter_700Bold",
     fontSize: 38,
     lineHeight: 43,
     letterSpacing: -1.1,
   },
   heading: {
-    fontFamily: Platform.select({
-      ios: "Georgia-Bold",
-      android: "serif",
-      web: "Georgia, serif",
-    }),
-    fontWeight: "700",
+    fontFamily: "Inter_700Bold",
     fontSize: 29,
     lineHeight: 35,
     letterSpacing: -0.55,
   },
   section: {
-    fontFamily: Platform.select({
-      ios: "Georgia-Bold",
-      android: "serif",
-      web: "Georgia, serif",
-    }),
-    fontWeight: "700",
+    fontFamily: "Inter_700Bold",
     fontSize: 19,
     lineHeight: 25,
     letterSpacing: -0.2,
