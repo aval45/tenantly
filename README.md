@@ -8,7 +8,7 @@ Copy .env.example to .env and supply EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SU
 
 Only the project URL and publishable key belong in the mobile app. Never add a service-role key to an EXPO_PUBLIC value. When the values are absent, the app shows a configuration-required screen; it never substitutes mock data.
 
-Apply both files in supabase/migrations to the target project. They create the P0 tables, RLS policies, private Storage buckets, transactional functions, notification triggers, and indexes.
+Apply every file in `supabase/migrations` in timestamp order. Migrations are immutable: release-readiness changes are contained in the latest migration and must ship with the compatible client build. They create the P0 tables, property-scoped RLS policies, private Storage buckets, transactional functions, notification triggers, and financial/occupancy constraints.
 
 ## Run
 
@@ -30,4 +30,6 @@ For local Supabase, start Docker Desktop and then run:
     npm run doctor
     npx expo export --platform web
 
-Push registration activates after the app is associated with an EAS project ID. Sentry remains optional through EXPO_PUBLIC_SENTRY_DSN.
+Push registration activates after `EXPO_PUBLIC_EAS_PROJECT_ID` is configured. Sentry remains optional through `EXPO_PUBLIC_SENTRY_DSN`.
+
+Before production, reset staging, run the pgTAP suite, smoke-test owner/manager/tenant flows, then deploy the database migration and compatible client together.

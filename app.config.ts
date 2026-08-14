@@ -13,6 +13,7 @@ function getEnvironment(): AppEnvironment {
 }
 
 const environment = getEnvironment();
+const easProjectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID;
 if (environment !== "local") {
   const required = [
     "EXPO_PUBLIC_SUPABASE_URL",
@@ -66,7 +67,11 @@ const config: ExpoConfig = {
     ],
   ],
   experiments: { typedRoutes: true, reactCompiler: true },
-  extra: { appEnvironment: environment },
+  extra: {
+    appEnvironment: environment,
+    easProjectId,
+    eas: easProjectId ? { projectId: easProjectId } : undefined,
+  },
 };
 
 export default config;

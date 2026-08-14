@@ -1,9 +1,23 @@
 const fs = require("node:fs");
-const QRCode = require("C:/tenantly-expo-go/node_modules/qrcode-terminal/vendor/QRCode");
-const QRErrorCorrectLevel = require("C:/tenantly-expo-go/node_modules/qrcode-terminal/vendor/QRCode/QRErrorCorrectLevel");
+const os = require("node:os");
+const path = require("node:path");
+const qrPackageRoot = path.dirname(
+  require.resolve("qrcode-terminal/package.json"),
+);
+const QRCode = require(path.join(qrPackageRoot, "vendor/QRCode"));
+const QRErrorCorrectLevel = require(
+  path.join(qrPackageRoot, "vendor/QRCode/QRErrorCorrectLevel"),
+);
 
-const target = "exp://172.20.10.2:8081";
-const output = "C:/tenantly/expo-go-qr.svg";
+const detectedHost = Object.values(os.networkInterfaces())
+  .flat()
+  .find(
+    (address) => address && address.family === "IPv4" && !address.internal,
+  )?.address;
+const host = process.env.EXPO_DEV_HOST || detectedHost || "localhost";
+const port = process.env.EXPO_DEV_PORT || "8081";
+const target = process.env.EXPO_DEV_URL || `exp://${host}:${port}`;
+const output = path.join(__dirname, "..", "expo-go-qr.svg");
 const quietZone = 4;
 const moduleSize = 12;
 const qr = new QRCode(-1, QRErrorCorrectLevel.M);

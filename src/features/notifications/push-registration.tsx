@@ -9,8 +9,19 @@ export function PushRegistration() {
   const { session } = useAuth();
   useEffect(() => {
     if (!session) return;
-    const projectId = Constants.easConfig?.projectId;
-    if (!projectId) return;
+    const configuredProjectId = Constants.expoConfig?.extra?.easProjectId;
+    const projectId =
+      Constants.easConfig?.projectId ??
+      (typeof configuredProjectId === "string"
+        ? configuredProjectId
+        : undefined);
+    if (!projectId) {
+      if (__DEV__)
+        console.warn(
+          "Push registration disabled: configure EXPO_PUBLIC_EAS_PROJECT_ID.",
+        );
+      return;
+    }
     void (async () => {
       if (Platform.OS === "android")
         await Notifications.setNotificationChannelAsync("default", {
@@ -38,7 +49,9 @@ export function PushRegistration() {
           { onConflict: "expo_push_token" },
         );
       if (error) throw error;
-    })().catch(() => undefined);
+    })().catch((error: unknown) => {
+      if (__DEV__) console.warn("Push registration unavailable", error);
+    });
   }, [session]);
   return null;
 }
