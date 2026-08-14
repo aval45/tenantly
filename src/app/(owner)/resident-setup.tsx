@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
 import { residentService } from "@/features/residents/service";
@@ -17,6 +17,8 @@ export default function ResidentSetup() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const org = session?.activeOrganizationId ?? "";
+  if (!session?.capabilities.manageOrganization)
+    return <Redirect href="/unauthorized" />;
   async function save() {
     setSaving(true);
     try {

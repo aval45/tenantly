@@ -1,4 +1,4 @@
-import { useRouter } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
 import {
@@ -26,6 +26,8 @@ export default function PropertySetupScreen() {
   });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  if (!session?.capabilities.createProperties)
+    return <Redirect href="/unauthorized" />;
   async function save() {
     setSaving(true);
     setError(null);
@@ -50,9 +52,7 @@ export default function PropertySetupScreen() {
         typeof cause.message === "string"
           ? cause.message
           : null;
-      setError(
-        message ?? "Could not add property.",
-      );
+      setError(message ?? "Could not add property.");
     } finally {
       setSaving(false);
     }

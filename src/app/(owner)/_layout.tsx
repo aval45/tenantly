@@ -34,7 +34,11 @@ export default function OwnerTabsLayout() {
   const { width } = useWindowDimensions();
   const { status, activeMembership } = useAuth();
   if (status === "unauthenticated") return <Redirect href="/(auth)/login" />;
-  if (status === "authenticated" && activeMembership?.role !== "owner")
+  if (status === "error") return <Redirect href="/" />;
+  if (
+    status === "authenticated" &&
+    !["owner", "manager"].includes(activeMembership?.role ?? "")
+  )
     return <Redirect href="/unauthorized" />;
 
   return (

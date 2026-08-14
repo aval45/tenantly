@@ -24,6 +24,7 @@ export default function TenantLayout() {
   const { width } = useWindowDimensions();
   const { status, activeMembership } = useAuth();
   if (status === "unauthenticated") return <Redirect href="/(auth)/login" />;
+  if (status === "error") return <Redirect href="/" />;
   if (status === "authenticated" && activeMembership?.role !== "tenant")
     return <Redirect href="/unauthorized" />;
   const options = {

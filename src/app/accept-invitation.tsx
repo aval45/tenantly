@@ -3,6 +3,7 @@ import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { invitationService } from "@/features/invitations/service";
 import { useAuth } from "@/shared/auth/auth-provider";
+import { savePendingInvitation } from "@/shared/auth/pending-invitation";
 import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
 import { spacing, useTenantlyColors } from "@/shared/theme/tokens";
@@ -15,6 +16,7 @@ export default function AcceptInvitation() {
   const [saving, setSaving] = useState(false);
   async function accept() {
     if (status !== "authenticated") {
+      await savePendingInvitation(token);
       router.replace("/(auth)/login" as never);
       return;
     }

@@ -7,7 +7,8 @@ export default function SetupLayout() {
   const { status, activeMembership } = useAuth();
   const navigationAnimation = useNavigationAnimation();
   if (status === "unauthenticated") return <Redirect href="/(auth)/login" />;
-  if (activeMembership) return <Redirect href="/(owner)" />;
+  if (status === "error") return <Redirect href="/" />;
+  if (activeMembership) return <Redirect href="/" />;
   return (
     <Stack
       screenOptions={{

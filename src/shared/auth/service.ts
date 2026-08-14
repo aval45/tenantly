@@ -1,22 +1,29 @@
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import * as Linking from "expo-linking";
+import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 
 import { createSupabaseOrganizationService } from "@/features/organizations/service";
 import { getSupabaseClient } from "@/shared/api/supabase";
 
-import type { AppSession, Membership } from "./types";
+import { capabilitiesFor, type AppSession, type Membership } from "./types";
 
 const activeOrganizationKey = "tenantly.active-organization";
 
-function getSavedOrganizationId() {
-  if (typeof globalThis.localStorage === "undefined") return null;
-  return globalThis.localStorage.getItem(activeOrganizationKey);
+async function getSavedOrganizationId() {
+  if (Platform.OS === "web")
+    return globalThis.localStorage?.getItem(activeOrganizationKey) ?? null;
+  return SecureStore.getItemAsync(activeOrganizationKey);
 }
 
-function saveOrganizationId(value: string | null) {
-  if (typeof globalThis.localStorage === "undefined") return;
-  if (value) globalThis.localStorage.setItem(activeOrganizationKey, value);
-  else globalThis.localStorage.removeItem(activeOrganizationKey);
+async function saveOrganizationId(value: string | null) {
+  if (Platform.OS === "web") {
+    if (value) globalThis.localStorage?.setItem(activeOrganizationKey, value);
+    else globalThis.localStorage?.removeItem(activeOrganizationKey);
+    return;
+  }
+  if (value) await SecureStore.setItemAsync(activeOrganizationKey, value);
+  else await SecureStore.deleteItemAsync(activeOrganizationKey);
 }
 
 async function hydrateSession(
@@ -27,29 +34,35 @@ async function hydrateSession(
   const [profileResult, memberships] = await Promise.all([
     client
       .from("profiles")
-      .select("full_name")
+      .select("full_name,phone_e164")
       .eq("id", session.user.id)
       .single(),
     createSupabaseOrganizationService(client).listActiveMemberships(),
   ]);
   if (profileResult.error) throw profileResult.error;
-  const saved = getSavedOrganizationId();
+  const saved = await getSavedOrganizationId();
   const activeOrganizationId = memberships.some(
     (item) => item.organizationId === saved,
   )
     ? saved
     : (memberships[0]?.organizationId ?? null);
+  const normalizedMemberships = memberships.map((item): Membership => ({
+    ...item,
+    status: "active",
+  }));
+  const activeRole = normalizedMemberships.find(
+    (item) => item.organizationId === activeOrganizationId,
+  )?.role;
   return {
     userId: session.user.id,
     profile: {
       fullName: profileResult.data.full_name,
       email: session.user.email ?? "",
+      phone: profileResult.data.phone_e164,
     },
-    memberships: memberships.map((item): Membership => ({
-      ...item,
-      status: "active",
-    })),
+    memberships: normalizedMemberships,
     activeOrganizationId,
+    capabilities: capabilitiesFor(activeRole),
   };
 }
 
@@ -117,13 +130,13 @@ export const supabaseAuthService = {
     if (error) throw error;
     return hydrateSession(data.session);
   },
-  setActiveOrganization(organizationId: string) {
-    saveOrganizationId(organizationId);
+  async setActiveOrganization(organizationId: string) {
+    await saveOrganizationId(organizationId);
   },
   async signOut() {
     const { error } = await getSupabaseClient().auth.signOut();
     if (error) throw error;
-    saveOrganizationId(null);
+    await saveOrganizationId(null);
   },
 };
 

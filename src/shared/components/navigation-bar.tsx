@@ -22,8 +22,8 @@ export function NavigationBar() {
   const pathname = usePathname();
   const router = useRouter();
   const { activeMembership } = useAuth();
-  const owner = activeMembership?.role === "owner";
-  const items: Item[] = owner
+  const operator = ["owner", "manager"].includes(activeMembership?.role ?? "");
+  const items: Item[] = operator
     ? [
         { label: "Home", href: "/(owner)", Icon: House },
         {
@@ -59,8 +59,9 @@ export function NavigationBar() {
       <View style={styles.items}>
         {items.map(({ label, href, Icon }) => {
           const active =
-            label === "More" &&
-            ["/profile", "/organizations"].includes(pathname);
+            (label === "More" &&
+              ["/profile", "/organizations"].includes(pathname)) ||
+            (label === "Home" && pathname === "/notifications");
           return (
             <Pressable
               key={label}

@@ -10,6 +10,7 @@ export default function OrganizationsRoute() {
   if (status === "unconfigured")
     return <Redirect href={"/configuration-required" as never} />;
   if (status === "restoring") return null;
+  if (status === "error") return <Redirect href="/" />;
   if (status === "unauthenticated") return <Redirect href="/(auth)/login" />;
   return <OrganizationsScreen />;
 }
@@ -35,6 +36,7 @@ function OrganizationsScreen() {
             key={item.id}
             accessibilityRole="radio"
             accessibilityState={{ selected }}
+            aria-checked={selected}
             onPress={() => void select(item.organizationId)}
             style={[
               s.row,

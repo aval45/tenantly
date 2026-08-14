@@ -2,6 +2,7 @@ import { Link, useRouter } from "expo-router";
 import { useState } from "react";
 
 import { useAuth } from "@/shared/auth/auth-provider";
+import { takePendingInvitation } from "@/shared/auth/pending-invitation";
 import { AuthFormScreen } from "@/shared/components/auth-form-screen";
 
 export default function LoginScreen() {
@@ -35,7 +36,12 @@ export default function LoginScreen() {
             email: values.email ?? "",
             password: values.password ?? "",
           });
-          router.replace("/");
+          const invitationToken = await takePendingInvitation();
+          router.replace(
+            invitationToken
+              ? (`/accept-invitation?token=${encodeURIComponent(invitationToken)}` as never)
+              : "/",
+          );
         } catch (cause) {
           setError(cause instanceof Error ? cause.message : "Sign in failed.");
         }

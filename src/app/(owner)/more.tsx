@@ -8,6 +8,7 @@ import {
   LogOut,
   Megaphone,
   UserRound,
+  UserPlus,
   Users,
 } from "lucide-react-native";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -18,6 +19,7 @@ import { motion } from "@/shared/theme/motion";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
 import { type AppTheme, useAppContextStore } from "@/stores/app-context";
 const appearance: { value: AppTheme; label: string }[] = [
+  { value: "system", label: "System" },
   { value: "light", label: "Light" },
   { value: "dark", label: "Dark" },
 ];
@@ -59,6 +61,25 @@ export default function MoreScreen() {
         </View>
       </View>
       <View style={[s.list, { borderColor: colors.border }]}>
+        {session?.capabilities.manageMembers ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push("/(owner)/invite" as never)}
+            style={({ pressed }) => [
+              s.row,
+              {
+                borderBottomColor: colors.border,
+                backgroundColor: pressed ? colors.surfaceSubtle : "transparent",
+              },
+            ]}
+          >
+            <UserPlus size={19} color={colors.primary} />
+            <AppText variant="label" style={{ flex: 1 }}>
+              Invite manager
+            </AppText>
+            <ChevronRight size={18} color={colors.textMuted} />
+          </Pressable>
+        ) : null}
         {links.map(({ label, path, Icon }) => (
           <Pressable
             key={label}
@@ -89,6 +110,7 @@ export default function MoreScreen() {
             key={item.value}
             accessibilityRole="radio"
             accessibilityState={{ selected: item.value === theme }}
+            aria-checked={item.value === theme}
             onPress={() => setTheme(item.value)}
             style={({ pressed }) => [
               s.segmentItem,

@@ -1,7 +1,11 @@
-import { useLocalSearchParams } from "expo-router";
-import { Share, StyleSheet, TextInput, View } from "react-native";
+import { Redirect, useLocalSearchParams } from "expo-router";
+import { Pressable, Share, StyleSheet, TextInput, View } from "react-native";
 import { useState } from "react";
+import { Check } from "lucide-react-native";
+import { useQuery } from "@tanstack/react-query";
 import { invitationService } from "@/features/invitations/service";
+import { propertyService } from "@/features/properties/service";
+import { queryKeys } from "@/shared/api/query-keys";
 import { useAuth } from "@/shared/auth/auth-provider";
 import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
@@ -15,14 +19,27 @@ export default function InviteScreen() {
   const [link, setLink] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [propertyIds, setPropertyIds] = useState<string[]>([]);
+  const isManagerInvite = !residentId;
+  const properties = useQuery({
+    queryKey: queryKeys.properties(
+      session?.userId ?? "",
+      session?.activeOrganizationId ?? "",
+    ),
+    queryFn: () => propertyService.list(session?.activeOrganizationId ?? ""),
+    enabled: isManagerInvite && !!session?.activeOrganizationId,
+  });
+  if (!session?.capabilities.manageMembers)
+    return <Redirect href="/unauthorized" />;
   async function create() {
     setSaving(true);
     try {
       const value = await invitationService.create({
         organizationId: session?.activeOrganizationId ?? "",
-        residentId,
-        role: "tenant",
+        residentId: isManagerInvite ? undefined : residentId,
+        role: isManagerInvite ? "manager" : "tenant",
         email,
+        propertyIds: isManagerInvite ? propertyIds : [],
       });
       setLink(`tenantly://accept-invitation?token=${value.token}`);
     } catch (cause) {
@@ -36,7 +53,9 @@ export default function InviteScreen() {
   return (
     <Screen>
       <View style={s.header}>
-        <AppText variant="heading">Invite resident</AppText>
+        <AppText variant="heading">
+          Invite {isManagerInvite ? "manager" : "resident"}
+        </AppText>
         <AppText muted>
           The secure link expires in seven days and can be used once.
         </AppText>
@@ -56,6 +75,41 @@ export default function InviteScreen() {
           },
         ]}
       />
+      {isManagerInvite ? (
+        <View style={s.properties}>
+          <AppText variant="label">Assigned properties</AppText>
+          {properties.data?.map((property) => {
+            const selected = propertyIds.includes(property.id);
+            return (
+              <Pressable
+                key={property.id}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: selected }}
+                aria-checked={selected}
+                onPress={() =>
+                  setPropertyIds((current) =>
+                    selected
+                      ? current.filter((id) => id !== property.id)
+                      : [...current, property.id],
+                  )
+                }
+                style={({ pressed }) => [
+                  s.property,
+                  {
+                    borderColor: selected ? colors.accent : colors.border,
+                    opacity: pressed ? 0.72 : 1,
+                  },
+                ]}
+              >
+                <AppText variant="label" style={{ flex: 1 }}>
+                  {property.name}
+                </AppText>
+                {selected ? <Check size={18} color={colors.accent} /> : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
       {error ? (
         <AppText style={{ color: colors.danger }}>{error}</AppText>
       ) : null}
@@ -70,7 +124,11 @@ export default function InviteScreen() {
       ) : (
         <PrimaryButton
           label={saving ? "Creating…" : "Create invitation"}
-          isDisabled={saving || !email.includes("@")}
+          isDisabled={
+            saving ||
+            !email.includes("@") ||
+            (isManagerInvite && propertyIds.length === 0)
+          }
           onPress={() => void create()}
         />
       )}
@@ -86,5 +144,14 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 16,
     marginBottom: spacing.md,
+  },
+  properties: { gap: 8, marginBottom: spacing.md },
+  property: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderRadius: radii.control,
   },
 });

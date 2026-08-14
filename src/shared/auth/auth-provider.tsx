@@ -10,16 +10,19 @@ import {
 
 import { createSupabaseOrganizationService } from "@/features/organizations/service";
 import { getSupabaseClient, isSupabaseConfigured } from "@/shared/api/supabase";
+import { queryClient } from "@/shared/api/query-client";
 
 import { supabaseAuthService, type Credentials } from "./service";
-import type { AppSession, Membership } from "./types";
+import { capabilitiesFor, type AppSession, type Membership } from "./types";
 
 export type AuthStatus =
-  "restoring" | "authenticated" | "unauthenticated" | "unconfigured";
+  "restoring" | "authenticated" | "unauthenticated" | "unconfigured" | "error";
 type AuthContextValue = {
   status: AuthStatus;
   session: AppSession | null;
   activeMembership: Membership | null;
+  restoreError: string | null;
+  retryRestore(): Promise<void>;
   signIn(input: Credentials): Promise<void>;
   signUp(input: Credentials & { fullName: string }): Promise<boolean>;
   resendSignUpConfirmation(email: string): Promise<void>;
@@ -41,9 +44,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<AuthStatus>(
     isSupabaseConfigured() ? "restoring" : "unconfigured",
   );
+  const [restoreError, setRestoreError] = useState<string | null>(null);
   const refreshSession = useCallback(async () => {
     const next = await supabaseAuthService.refresh();
     setSession(next);
+    setRestoreError(null);
     setStatus(next ? "authenticated" : "unauthenticated");
   }, []);
 
@@ -57,11 +62,19 @@ export function AuthProvider({ children }: PropsWithChildren) {
         setSession(next);
         setStatus(next ? "authenticated" : "unauthenticated");
       })
-      .catch(() => {
-        if (mounted) setStatus("unauthenticated");
+      .catch((cause) => {
+        if (mounted) {
+          setRestoreError(
+            cause instanceof Error
+              ? cause.message
+              : "Session could not be restored.",
+          );
+          setStatus("error");
+        }
       });
     const subscription = supabaseAuthService.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT") {
+        queryClient.clear();
         setSession(null);
         setStatus("unauthenticated");
       } else if (
@@ -87,19 +100,34 @@ export function AuthProvider({ children }: PropsWithChildren) {
       status,
       session,
       activeMembership,
+      restoreError,
+      async retryRestore() {
+        setStatus("restoring");
+        try {
+          await refreshSession();
+        } catch (cause) {
+          setRestoreError(
+            cause instanceof Error
+              ? cause.message
+              : "Session could not be restored.",
+          );
+          setStatus("error");
+        }
+      },
       async signIn(input) {
         const next = await supabaseAuthService.signIn(input);
+        queryClient.clear();
         setSession(next);
         setStatus(next ? "authenticated" : "unauthenticated");
       },
       async signUp(input) {
         const result = await supabaseAuthService.signUp(input);
+        queryClient.clear();
         setSession(result.session);
         setStatus(result.session ? "authenticated" : "unauthenticated");
         return result.requiresVerification;
       },
-      resendSignUpConfirmation:
-        supabaseAuthService.resendSignUpConfirmation,
+      resendSignUpConfirmation: supabaseAuthService.resendSignUpConfirmation,
       requestPasswordReset: supabaseAuthService.requestPasswordReset,
       updatePassword: supabaseAuthService.updatePassword,
       async completeOwnerSetup({ organizationName, slug }) {
@@ -113,19 +141,31 @@ export function AuthProvider({ children }: PropsWithChildren) {
         await refreshSession();
       },
       async selectOrganization(organizationId) {
-        supabaseAuthService.setActiveOrganization(organizationId);
+        await supabaseAuthService.setActiveOrganization(organizationId);
+        queryClient.clear();
         setSession((current) =>
-          current ? { ...current, activeOrganizationId: organizationId } : null,
+          current
+            ? {
+                ...current,
+                activeOrganizationId: organizationId,
+                capabilities: capabilitiesFor(
+                  current.memberships.find(
+                    (item) => item.organizationId === organizationId,
+                  )?.role,
+                ),
+              }
+            : null,
         );
       },
       refreshSession,
       async signOut() {
         await supabaseAuthService.signOut();
+        queryClient.clear();
         setSession(null);
         setStatus("unauthenticated");
       },
     }),
-    [activeMembership, refreshSession, session, status],
+    [activeMembership, refreshSession, restoreError, session, status],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
