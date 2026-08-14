@@ -1,0 +1,82 @@
+@import "tailwindcss";
+@import "uniwind";
+@import "heroui-native/styles";
+
+@source './';
+@source '../node_modules/heroui-native/lib';
+
+@theme {
+  --font-normal: "Inter_400Regular";
+  --font-medium: "Inter_500Medium";
+  --font-semibold: "Inter_600SemiBold";
+  --font-bold: "Inter_700Bold";
+  --radius-control: 4px;
+  --radius-card: 3px;
+  --radius-dialog: 6px;
+}
+
+@layer theme {
+  @variant light {
+    --background: #f3efe4;
+    --foreground: #142f35;
+    --surface: #faf7ee;
+    --surface-foreground: #142f35;
+    --surface-secondary: #e8e1d2;
+    --surface-secondary-foreground: #29464b;
+    --surface-tertiary: #cfc6b5;
+    --surface-tertiary-foreground: #142f35;
+    --overlay: #fffdf7;
+    --overlay-foreground: #142f35;
+    --muted: #647174;
+    --default: #e8e1d2;
+    --default-foreground: #29464b;
+    --accent: #12363c;
+    --accent-foreground: #fff8e8;
+    --field-background: #fffdf7;
+    --field-foreground: #142f35;
+    --field-placeholder: #71717a;
+    --field-border: #bfb5a2;
+    --success: #277157;
+    --success-foreground: #ffffff;
+    --warning: #936516;
+    --warning-foreground: #ffffff;
+    --danger: #b34236;
+    --danger-foreground: #ffffff;
+    --border: #cfc6b5;
+    --separator: #cfc6b5;
+    --focus: #df593e;
+    --link: #b34236;
+  }
+
+  @variant dark {
+    --background: #0d2024;
+    --foreground: #f5efdf;
+    --surface: #142c31;
+    --surface-foreground: #f5efdf;
+    --surface-secondary: #213b40;
+    --surface-secondary-foreground: #f5efdf;
+    --surface-tertiary: #365157;
+    --surface-tertiary-foreground: #f5efdf;
+    --overlay: #19343a;
+    --overlay-foreground: #f5efdf;
+    --muted: #a7b7b6;
+    --default: #213b40;
+    --default-foreground: #f5efdf;
+    --accent: #bfd9d2;
+    --accent-foreground: #0d2024;
+    --field-background: #19343a;
+    --field-foreground: #f5efdf;
+    --field-placeholder: #aeb9b4;
+    --field-border: #557077;
+    --success: #78c9a9;
+    --success-foreground: #101715;
+    --warning: #e3bd67;
+    --warning-foreground: #211707;
+    --danger: #f08f80;
+    --danger-foreground: #240b08;
+    --border: #365157;
+    --separator: #365157;
+    --focus: #f17959;
+    --link: #ff9a7d;
+  }
+}

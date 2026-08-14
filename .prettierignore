@@ -1,0 +1,8 @@
+node_modules
+.expo
+.cursor
+src/uniwind-types.d.ts
+assets
+scrap
+design-system
+prd.md
