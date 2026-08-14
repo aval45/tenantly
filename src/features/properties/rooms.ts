@@ -28,57 +28,48 @@ export const roomService = {
       .eq("status", "active")
       .order("code");
     if (error) throw error;
-    return Promise.all(
-      data.map(async (room) => {
-        const { count, error: countError } = await client
+    const roomIds = data.map((room) => room.id);
+    const { data: assignments, error: assignmentsError } = roomIds.length
+      ? await client
           .from("occupancy_assignments")
-          .select("id", { count: "exact", head: true })
-          .eq("room_id", room.id)
-          .is("ends_at", null);
-        if (countError) throw countError;
-        return {
-          id: room.id,
-          organizationId: room.organization_id,
-          propertyId: room.property_id,
-          code: room.code,
-          floor: room.floor_label ?? undefined,
-          bedCount: room.capacity,
-          monthlyRentPaise: room.default_rent_paise,
-          depositPaise: room.default_deposit_paise,
-          occupiedBeds: count ?? 0,
-        };
-      }),
+          .select("room_id")
+          .in("room_id", roomIds)
+          .is("ends_at", null)
+      : { data: [], error: null };
+    if (assignmentsError) throw assignmentsError;
+    const occupancy = new Map<string, number>();
+    assignments.forEach((item) =>
+      occupancy.set(item.room_id, (occupancy.get(item.room_id) ?? 0) + 1),
     );
+    return data.map((room) => ({
+      id: room.id,
+      organizationId: room.organization_id,
+      propertyId: room.property_id,
+      code: room.code,
+      floor: room.floor_label ?? undefined,
+      bedCount: room.capacity,
+      monthlyRentPaise: room.default_rent_paise,
+      depositPaise: room.default_deposit_paise,
+      occupiedBeds: occupancy.get(room.id) ?? 0,
+    }));
   },
   async create(input: CreateRoomCommand): Promise<string> {
     const command = createRoomCommandSchema.parse(input);
-    const client = getSupabaseClient();
-    const { data, error } = await client
-      .from("rooms")
-      .insert({
-        organization_id: command.organizationId,
-        property_id: command.propertyId,
-        code: command.code,
-        floor_label: command.floor,
-        room_type: command.bedCount > 1 ? "shared" : "private",
-        capacity: command.bedCount,
-        default_rent_paise: command.monthlyRentPaise,
-        default_deposit_paise: command.depositPaise,
-      })
-      .select("id")
-      .single();
+    const { data, error } = await getSupabaseClient().rpc(
+      "create_room_with_beds",
+      {
+        requested_organization_id: command.organizationId,
+        requested_property_id: command.propertyId,
+        requested_code: command.code,
+        requested_floor_label: command.floor ?? null,
+        requested_room_type: command.bedCount > 1 ? "shared" : "private",
+        requested_capacity: command.bedCount,
+        requested_rent_paise: command.monthlyRentPaise,
+        requested_deposit_paise: command.depositPaise,
+      },
+    );
     if (error) throw error;
-    if (command.bedCount > 1) {
-      const { error: bedsError } = await client.from("beds").insert(
-        Array.from({ length: command.bedCount }, (_, index) => ({
-          organization_id: command.organizationId,
-          room_id: data.id,
-          code: `B${index + 1}`,
-        })),
-      );
-      if (bedsError) throw bedsError;
-    }
-    return data.id;
+    return data;
   },
   async archive(id: string) {
     const { error } = await getSupabaseClient()

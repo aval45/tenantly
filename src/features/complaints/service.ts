@@ -24,25 +24,28 @@ export const complaintService = {
     if (error) throw error;
     return data;
   },
-  async create(input: z.input<typeof complaintSchema>) {
+  async create(
+    input: z.input<typeof complaintSchema> & {
+      storagePath?: string;
+      mediaType?: string;
+    },
+  ) {
     const value = complaintSchema.parse(input);
-    const { data, error } = await getSupabaseClient()
-      .from("complaints")
-      .insert({
-        organization_id: value.organizationId,
-        resident_id: value.residentId,
-        tenancy_id: value.tenancyId ?? null,
-        property_id: value.propertyId,
-        room_id: value.roomId ?? null,
-        category: value.category,
-        title: value.title,
-        description: value.description,
-        priority: value.priority,
-      })
-      .select("id")
-      .single();
+    if (!value.tenancyId) throw new Error("tenancy_required");
+    const { data, error } = await getSupabaseClient().rpc(
+      "create_complaint_with_attachment",
+      {
+        requested_tenancy_id: value.tenancyId,
+        requested_category: value.category,
+        requested_priority: value.priority,
+        requested_title: value.title,
+        requested_description: value.description,
+        requested_storage_path: input.storagePath ?? null,
+        requested_media_type: input.mediaType ?? null,
+      },
+    );
     if (error) throw error;
-    return data.id;
+    return data;
   },
   async transition(id: string, status: ComplaintStatus, note?: string) {
     const { data, error } = await getSupabaseClient().rpc(

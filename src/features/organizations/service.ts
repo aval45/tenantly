@@ -22,6 +22,7 @@ export type OrganizationMembershipSummary = {
   organizationId: string;
   organizationName: string;
   role: MembershipRole;
+  assignedPropertyIds: string[];
 };
 
 export type OrganizationService = {
@@ -53,22 +54,37 @@ export function createSupabaseOrganizationService(
         .eq("status", "active");
       if (membershipsError) throw membershipsError;
 
-      return Promise.all(
-        memberships.map(async (membership) => {
-          const { data: organization, error: organizationError } = await client
-            .from("organizations")
-            .select("name")
-            .eq("id", membership.organization_id)
-            .single();
-          if (organizationError) throw organizationError;
-          return {
-            id: membership.id,
-            organizationId: membership.organization_id,
-            organizationName: organization.name,
-            role: membership.role,
-          };
-        }),
+      const organizationIds = [
+        ...new Set(memberships.map((item) => item.organization_id)),
+      ];
+      const membershipIds = memberships.map((item) => item.id);
+      const [organizationsResult, assignmentsResult] = await Promise.all([
+        client
+          .from("organizations")
+          .select("id,name")
+          .in("id", organizationIds),
+        membershipIds.length
+          ? client
+              .from("property_memberships")
+              .select("organization_membership_id,property_id")
+              .in("organization_membership_id", membershipIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (organizationsResult.error) throw organizationsResult.error;
+      if (assignmentsResult.error) throw assignmentsResult.error;
+      const organizationNames = new Map(
+        organizationsResult.data.map((item) => [item.id, item.name]),
       );
+      return memberships.map((membership) => ({
+        id: membership.id,
+        organizationId: membership.organization_id,
+        organizationName:
+          organizationNames.get(membership.organization_id) ?? "Organization",
+        role: membership.role,
+        assignedPropertyIds: assignmentsResult.data
+          .filter((item) => item.organization_membership_id === membership.id)
+          .map((item) => item.property_id),
+      }));
     },
   };
 }

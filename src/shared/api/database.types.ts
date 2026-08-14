@@ -309,6 +309,7 @@ export type PaymentRow = {
   id: string;
   organization_id: string;
   payer_resident_id: string;
+  submitted_invoice_id: string | null;
   amount_paise: number;
   currency: string;
   method: PaymentMethod;
@@ -323,6 +324,20 @@ export type PaymentRow = {
   idempotency_key: string | null;
   created_at: string;
   updated_at: string;
+};
+export type InvitationPropertyRow = {
+  invitation_id: string;
+  organization_id: string;
+  property_id: string;
+  created_at: string;
+};
+export type PaymentAllocationRow = {
+  id: string;
+  organization_id: string;
+  payment_id: string;
+  invoice_id: string;
+  amount_paise: number;
+  created_at: string;
 };
 export type ReceiptRow = {
   id: string;
@@ -459,6 +474,7 @@ export type Database = {
         Update: PropertyMembershipUpdate;
         Relationships: [];
       };
+      invitation_properties: DomainTable<InvitationPropertyRow>;
       rooms: {
         Row: RoomRow;
         Insert: RoomInsert;
@@ -477,6 +493,7 @@ export type Database = {
       invoices: DomainTable<InvoiceRow>;
       invoice_items: DomainTable<InvoiceItemRow>;
       payments: DomainTable<PaymentRow>;
+      payment_allocations: DomainTable<PaymentAllocationRow>;
       receipts: DomainTable<ReceiptRow>;
       complaints: DomainTable<ComplaintRow>;
       complaint_events: DomainTable<ComplaintEventRow>;
@@ -491,6 +508,14 @@ export type Database = {
     Functions: {
       can_access_property: {
         Args: { requested_property_id: string };
+        Returns: boolean;
+      };
+      can_access_resident: {
+        Args: { requested_resident_id: string };
+        Returns: boolean;
+      };
+      can_access_payment: {
+        Args: { requested_payment_id: string };
         Returns: boolean;
       };
       create_organization_with_owner: {
@@ -583,14 +608,59 @@ export type Database = {
           requested_organization_id: string;
           requested_resident_id: string | null;
           requested_role: MembershipRole;
-          requested_email: string | null;
-          requested_phone: string | null;
-          requested_expires_at: string;
+          requested_email: string;
+          requested_property_ids?: string[];
         };
         Returns: Json;
       };
       accept_invitation: {
         Args: { raw_token: string };
+        Returns: string;
+      };
+      create_complaint_with_attachment: {
+        Args: {
+          requested_tenancy_id: string;
+          requested_category: string;
+          requested_priority: ComplaintPriority;
+          requested_title: string;
+          requested_description: string;
+          requested_storage_path?: string | null;
+          requested_media_type?: string | null;
+        };
+        Returns: string;
+      };
+      create_room_with_beds: {
+        Args: {
+          requested_organization_id: string;
+          requested_property_id: string;
+          requested_code: string;
+          requested_floor_label: string | null;
+          requested_room_type: RoomType;
+          requested_rent_paise: number;
+          requested_deposit_paise: number;
+          requested_capacity: number;
+        };
+        Returns: string;
+      };
+      register_resident_document: {
+        Args: {
+          requested_organization_id: string;
+          requested_resident_id: string;
+          requested_document_type: string;
+          requested_storage_path: string;
+        };
+        Returns: string;
+      };
+      publish_notice: {
+        Args: {
+          requested_organization_id: string;
+          requested_title: string;
+          requested_body: string;
+          requested_is_pinned: boolean;
+          requested_target_type:
+            "organization" | "property" | "room" | "resident";
+          requested_target_ids: string[];
+        };
         Returns: string;
       };
     };

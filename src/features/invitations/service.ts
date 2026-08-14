@@ -5,15 +5,19 @@ export const invitationSchema = z
     organizationId: z.string().uuid(),
     residentId: z.string().uuid().optional(),
     role: z.enum(["manager", "tenant"]),
-    email: z.string().email().optional(),
-    phone: z
-      .string()
-      .regex(/^\+?[0-9]{10,15}$/)
-      .optional(),
+    email: z.email(),
+    propertyIds: z.array(z.uuid()).default([]),
   })
-  .refine((value) => value.email || value.phone, {
-    message: "Email or phone is required.",
-  });
+  .refine(
+    (value) =>
+      value.role === "tenant"
+        ? !!value.residentId && value.propertyIds.length === 0
+        : !value.residentId && value.propertyIds.length > 0,
+    {
+      message:
+        "Tenant invitations require a resident; manager invitations require assigned properties.",
+    },
+  );
 export const invitationService = {
   async create(input: z.input<typeof invitationSchema>) {
     const value = invitationSchema.parse(input);
@@ -21,9 +25,8 @@ export const invitationService = {
       requested_organization_id: value.organizationId,
       requested_resident_id: value.residentId ?? null,
       requested_role: value.role,
-      requested_email: value.email ?? null,
-      requested_phone: value.phone ?? null,
-      requested_expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+      requested_email: value.email,
+      requested_property_ids: value.propertyIds,
     });
     if (error) throw error;
     return data as { id: string; token: string; expiresAt: string };
