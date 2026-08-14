@@ -34,6 +34,11 @@ insert into public.property_memberships (
   organization_id, organization_membership_id, property_id, role_override
 ) values (
   'aa111111-1111-4111-8111-111111111111',
+  'b0222222-2222-4222-8222-222222222222',
+  'a1111111-aaaa-4111-8111-111111111111',
+  'manager'
+), (
+  'aa111111-1111-4111-8111-111111111111',
   'd0444444-4444-4444-8444-444444444444',
   'a1111111-aaaa-4111-8111-111111111111',
   'maintenance_staff'
@@ -70,8 +75,8 @@ select is(
 select set_config('request.jwt.claim.sub', 'b2222222-2222-4222-8222-222222222222', true);
 select results_eq(
   $$ select count(*)::bigint from public.properties where organization_id = 'aa111111-1111-4111-8111-111111111111' $$,
-  $$ values (3::bigint) $$,
-  'manager reads organization properties'
+  $$ values (1::bigint) $$,
+  'manager reads only assigned properties'
 );
 select lives_ok(
   $$ insert into public.rooms (organization_id, property_id, code, room_type, capacity) values ('aa111111-1111-4111-8111-111111111111', 'a1111111-aaaa-4111-8111-111111111111', 'M-101', 'private', 1) $$,
