@@ -27,6 +27,7 @@ alter table public.tenancies add constraint tenancies_id_organization_unique uni
 alter table public.invoices add constraint invoices_id_organization_unique unique(id,organization_id);
 alter table public.payments add constraint payments_id_organization_unique unique(id,organization_id);
 alter table public.notices add constraint notices_id_organization_unique unique(id,organization_id);
+alter table public.beds add constraint beds_id_organization_unique unique(id,organization_id);
 
 alter table public.invitations
   add constraint invitations_resident_organization_fk foreign key(resident_id,organization_id) references public.residents(id,organization_id);
