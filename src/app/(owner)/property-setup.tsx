@@ -12,6 +12,7 @@ import { PrimaryButton } from "@/shared/components/primary-button";
 import { Screen } from "@/shared/components/screen";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
 import { queryKeys } from "@/shared/api/query-keys";
+import { toUserMessage } from "@/shared/errors/to-user-message";
 const fields = [
   ["name", "Property name"],
   ["addressLine1", "Address"],
@@ -36,11 +37,11 @@ export default function PropertySetupScreen() {
   });
   const formValues = {
     propertyType: values.propertyType ?? existing.data?.propertyType ?? "pg",
-    name: values.name ?? existing.data?.name ?? "",
-    addressLine1: values.addressLine1 ?? existing.data?.addressLine1 ?? "",
-    city: values.city ?? existing.data?.city ?? "",
-    state: values.state ?? existing.data?.state ?? "",
-    postalCode: values.postalCode ?? existing.data?.postalCode ?? "",
+    name: (values.name ?? existing.data?.name ?? "").trim(),
+    addressLine1: (values.addressLine1 ?? existing.data?.addressLine1 ?? "").trim(),
+    city: (values.city ?? existing.data?.city ?? "").trim(),
+    state: (values.state ?? existing.data?.state ?? "").trim(),
+    postalCode: (values.postalCode ?? existing.data?.postalCode ?? "").trim(),
   };
   if (!session?.capabilities.createProperties)
     return <Redirect href="/unauthorized" />;
@@ -48,11 +49,29 @@ export default function PropertySetupScreen() {
     setSaving(true);
     setError(null);
     try {
+      if (!formValues.name || formValues.name.length < 2) {
+        setError("Please enter a property name (at least 2 characters).");
+        return;
+      }
+      if (!formValues.addressLine1 || formValues.addressLine1.length < 3) {
+        setError("Please enter a valid property address.");
+        return;
+      }
+      if (!formValues.city) {
+        setError("Please enter the city.");
+        return;
+      }
+      if (!formValues.state) {
+        setError("Please enter the state.");
+        return;
+      }
+      if (!/^[1-9][0-9]{5}$/.test(formValues.postalCode)) {
+        setError("Please enter a valid 6-digit Indian PIN code (e.g. 560001).");
+        return;
+      }
       const parsed = createPropertyCommandSchema.safeParse(formValues);
       if (!parsed.success) {
-        setError(
-          "Complete every field and enter a valid six-digit Indian PIN code.",
-        );
+        setError(toUserMessage(parsed.error, "Please check all required fields."));
         return;
       }
       if (id) await propertyService.update(id, parsed.data);
@@ -89,14 +108,7 @@ export default function PropertySetupScreen() {
       if (router.canGoBack()) router.back();
       else router.replace("/(owner)/properties" as never);
     } catch (cause) {
-      const message =
-        cause &&
-        typeof cause === "object" &&
-        "message" in cause &&
-        typeof cause.message === "string"
-          ? cause.message
-          : null;
-      setError(message ?? "Could not add property.");
+      setError(toUserMessage(cause, id ? "Could not update property." : "Could not add property."));
     } finally {
       setSaving(false);
     }
@@ -142,7 +154,7 @@ export default function PropertySetupScreen() {
           </View>
         ))}
         {error ? (
-          <AppText style={{ color: colors.danger }}>{error}</AppText>
+          <AppText accessibilityRole="alert" style={{ color: colors.danger }}>{error}</AppText>
         ) : null}
         <PrimaryButton
           label={saving ? "Saving…" : id ? "Save property" : "Add property"}

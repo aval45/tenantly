@@ -11,6 +11,7 @@ import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
 import { Screen } from "@/shared/components/screen";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
+import { toUserMessage } from "@/shared/errors/to-user-message";
 export default function InviteScreen() {
   const { residentId } = useLocalSearchParams<{ residentId: string }>();
   const { session } = useAuth();
@@ -37,12 +38,26 @@ export default function InviteScreen() {
     return <Redirect href="/unauthorized" />;
   async function create() {
     setSaving(true);
+    setError(null);
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setError("Please enter a valid email address (e.g. name@example.com).");
+      setSaving(false);
+      return;
+    }
+    if (isManagerInvite && operatorRole === "manager" && propertyIds.length === 0) {
+      setError("Please select at least one property for the manager to oversee.");
+      setSaving(false);
+      return;
+    }
+
     try {
       const value = await invitationService.create({
         organizationId: session?.activeOrganizationId ?? "",
         residentId: isManagerInvite ? undefined : residentId,
         role: isManagerInvite ? operatorRole : "tenant",
-        email,
+        email: normalizedEmail,
         propertyIds: isManagerInvite ? propertyIds : [],
       });
       setLink(`tenantly://accept-invitation?token=${value.token}`);
@@ -61,9 +76,7 @@ export default function InviteScreen() {
         }),
       ]);
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Could not create invitation.",
-      );
+      setError(toUserMessage(cause, "Could not create invitation."));
     } finally {
       setSaving(false);
     }
@@ -150,7 +163,7 @@ export default function InviteScreen() {
         </View>
       ) : null}
       {error ? (
-        <AppText style={{ color: colors.danger }}>{error}</AppText>
+        <AppText accessibilityRole="alert" style={{ color: colors.danger }}>{error}</AppText>
       ) : null}
       {link ? (
         <>

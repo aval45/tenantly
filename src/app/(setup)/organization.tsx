@@ -1,5 +1,4 @@
-import { type ReactNode, useRef } from "react";
-
+import { useState, type ReactNode, useRef } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "expo-router";
 import { ArrowRight, CheckCircle2 } from "lucide-react-native";
@@ -24,6 +23,7 @@ import { AppText } from "@/shared/components/app-text";
 import { BrandMark } from "@/shared/components/brand-mark";
 import { PrimaryButton } from "@/shared/components/primary-button";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
+import { toUserMessage } from "@/shared/errors/to-user-message";
 
 type SetupForm = Pick<CreateOrganizationCommand, "name" | "slug">;
 const setupSchema = createOrganizationCommandSchema.pick({
@@ -36,6 +36,7 @@ export default function OrganizationSetupScreen() {
   const router = useRouter();
   const { completeOwnerSetup, signOut } = useAuth();
   const slugRef = useRef<TextInput>(null);
+  const [rootError, setRootError] = useState<string | null>(null);
   const {
     control,
     handleSubmit,
@@ -46,11 +47,16 @@ export default function OrganizationSetupScreen() {
   });
 
   async function onSubmit(values: SetupForm) {
-    await completeOwnerSetup({
-      organizationName: values.name,
-      slug: values.slug,
-    });
-    router.replace("/(owner)");
+    setRootError(null);
+    try {
+      await completeOwnerSetup({
+        organizationName: values.name.trim(),
+        slug: values.slug.trim(),
+      });
+      router.replace("/(owner)");
+    } catch (cause) {
+      setRootError(toUserMessage(cause, "Could not create workspace. Please try again."));
+    }
   }
 
   return (
@@ -170,6 +176,11 @@ export default function OrganizationSetupScreen() {
           </View>
 
           <View style={styles.footer}>
+            {rootError ? (
+              <AppText accessibilityRole="alert" style={{ color: colors.danger }}>
+                {rootError}
+              </AppText>
+            ) : null}
             <PrimaryButton
               label={isSubmitting ? "Creating workspace…" : "Create workspace"}
               isDisabled={isSubmitting}

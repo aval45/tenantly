@@ -69,6 +69,16 @@ export default function OccupancyManageScreen() {
   async function transfer() {
     setSaving(true);
     setError(null);
+    if (!propertyId) {
+      setError("Please select a target property.");
+      setSaving(false);
+      return;
+    }
+    if (!roomId) {
+      setError("Please select a target room.");
+      setSaving(false);
+      return;
+    }
     try {
       await residentService.transferOrVacate({
         tenancyId,

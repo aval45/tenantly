@@ -77,6 +77,13 @@ export default function PaymentDetail() {
   );
   async function performDecision(approve: boolean) {
     if (!payment) return;
+    if (!approve && reason.trim().length < 3) {
+      Alert.alert(
+        "Reason required",
+        "Please provide a reason for rejecting this payment (at least 3 characters).",
+      );
+      return;
+    }
     setSaving(true);
     try {
       const { allocations, remainingPaise } = buildPaymentAllocations(
@@ -93,7 +100,7 @@ export default function PaymentDetail() {
       await billingService.decidePayment(
         payment.id,
         approve,
-        reason || null,
+        reason.trim() || null,
         allocations,
       );
       const userId = session?.userId ?? "";

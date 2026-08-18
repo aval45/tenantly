@@ -52,7 +52,7 @@ export default function StaffTasks() {
     setBusy(id);
     setError(null);
     try {
-      await complaintService.transition(id, target, notes[id]);
+      await complaintService.transition(id, target, notes[id]?.trim() || undefined);
       await Promise.all([
         tasks.refetch(),
         cache.invalidateQueries({

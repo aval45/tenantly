@@ -63,16 +63,28 @@ export default function OwnerInvoiceDetail() {
     enabled: !!id,
   });
   async function recordCash() {
+    const amountNum = parseFloat(amount.trim());
+    if (isNaN(amountNum) || amountNum <= 0) {
+      setError("Please enter a valid cash amount greater than 0.");
+      return;
+    }
+    const amountPaise = Math.round(amountNum * 100);
+    const balancePaise = query.data?.invoice?.balance_paise ?? 0;
+    if (amountPaise > balancePaise) {
+      setError("Cash payment amount cannot exceed the remaining invoice balance.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
     setNotice(null);
     try {
       const result = await billingService.recordManualPayment({
         invoiceId: id,
-        amountPaise: Math.round(Number(amount) * 100),
+        amountPaise,
         paidOn: localDateISO(),
         method: "cash",
-        reference,
+        reference: reference.trim() || undefined,
         idempotencyKey: `cash-${id}-${Crypto.randomUUID()}`,
       });
       setAmount("");

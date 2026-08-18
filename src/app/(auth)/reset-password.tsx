@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useAuth } from "@/shared/auth/auth-provider";
 import { AuthFormScreen } from "@/shared/components/auth-form-screen";
+import { toUserMessage } from "@/shared/errors/to-user-message";
 
 export default function ResetPasswordScreen() {
   const { updatePassword } = useAuth();
@@ -22,18 +23,17 @@ export default function ResetPasswordScreen() {
       ]}
       error={error}
       onSubmit={async ({ password }) => {
-        if ((password?.length ?? 0) < 8) {
-          setError("Use at least 8 characters.");
+        const pwd = password ?? "";
+        if (pwd.length < 8) {
+          setError("Password must contain at least 8 characters.");
           return;
         }
         try {
-          await updatePassword(password ?? "");
+          await updatePassword(pwd);
           router.replace("/");
         } catch (cause) {
           setError(
-            cause instanceof Error
-              ? cause.message
-              : "Could not update the password.",
+            toUserMessage(cause, "Could not update the password. Please try again."),
           );
         }
       }}

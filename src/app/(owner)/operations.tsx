@@ -102,6 +102,17 @@ export default function OperationsScreen() {
       setError("Please select a property for this expense.");
       return;
     }
+    const trimmedDescription = description.trim();
+    if (!trimmedDescription || trimmedDescription.length < 3) {
+      setError("Please enter an expense description (at least 3 characters).");
+      return;
+    }
+    const amountNum = parseFloat(amount.trim());
+    if (isNaN(amountNum) || amountNum <= 0) {
+      setError("Please enter a valid expense amount greater than 0.");
+      return;
+    }
+
     setSavingExpense(true);
     setNotice(null);
     setError(null);
@@ -125,10 +136,10 @@ export default function OperationsScreen() {
         organizationId,
         propertyId,
         category,
-        description,
-        amountPaise: Math.round(Number(amount) * 100),
+        description: trimmedDescription,
+        amountPaise: Math.round(amountNum * 100),
         incurredOn: localDateISO(),
-        vendorName: vendor,
+        vendorName: vendor.trim() || undefined,
         receiptPath: uploadedPath,
       });
       setDescription("");
@@ -196,7 +207,15 @@ export default function OperationsScreen() {
   }
 
   async function renewAgreement() {
-    if (!residentId || !agreementExpiry) return;
+    if (!residentId) {
+      setError("Please select a resident to renew the agreement for.");
+      return;
+    }
+    const expiry = agreementExpiry.trim();
+    if (!expiry || !/^\d{4}-\d{2}-\d{2}$/.test(expiry)) {
+      setError("Please enter a valid expiry date in YYYY-MM-DD format (e.g. 2027-08-31).");
+      return;
+    }
     const picked = await DocumentPicker.getDocumentAsync({
       type: ["application/pdf", "image/jpeg", "image/png"],
       copyToCacheDirectory: true,
@@ -225,7 +244,7 @@ export default function OperationsScreen() {
         organizationId,
         residentId,
         storagePath: uploadedPath,
-        expiresOn: agreementExpiry,
+        expiresOn: expiry,
         supersedesDocumentId: prior?.id,
       });
       setAgreementExpiry("");

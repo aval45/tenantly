@@ -9,6 +9,7 @@ import { PrimaryButton } from "@/shared/components/primary-button";
 import { Screen } from "@/shared/components/screen";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
 import { queryKeys } from "@/shared/api/query-keys";
+import { toUserMessage } from "@/shared/errors/to-user-message";
 export default function RoomSetup() {
   const { propertyId, roomId } = useLocalSearchParams<{
     propertyId: string;
@@ -32,30 +33,51 @@ export default function RoomSetup() {
     enabled: !!roomId,
   });
   const existingRoom = existing.data?.find((item) => item.id === roomId);
-  const formCode = code || existingRoom?.code || "";
-  const formBeds = beds || (existingRoom ? String(existingRoom.bedCount) : "1");
-  const formRent =
-    rent || (existingRoom ? String(existingRoom.monthlyRentPaise / 100) : "0");
-  const formDeposit =
-    deposit || (existingRoom ? String(existingRoom.depositPaise / 100) : "0");
+  const formCode = (code || existingRoom?.code || "").trim();
+  const formBeds = (beds || (existingRoom ? String(existingRoom.bedCount) : "1")).trim();
+  const formRent = (
+    rent || (existingRoom ? String(existingRoom.monthlyRentPaise / 100) : "0")
+  ).trim();
+  const formDeposit = (
+    deposit || (existingRoom ? String(existingRoom.depositPaise / 100) : "0")
+  ).trim();
   async function save() {
     setSaving(true);
     setError(null);
     try {
+      if (!formCode) {
+        setError("Please enter a room number or code (e.g. 101, A).");
+        return;
+      }
+      const rentNum = parseFloat(formRent);
+      if (isNaN(rentNum) || rentNum < 0) {
+        setError("Please enter a valid monthly rent amount (0 or more).");
+        return;
+      }
+      const depositNum = parseFloat(formDeposit);
+      if (isNaN(depositNum) || depositNum < 0) {
+        setError("Please enter a valid deposit amount (0 or more).");
+        return;
+      }
+      const bedsNum = parseInt(formBeds, 10);
+      if (!roomId && (isNaN(bedsNum) || bedsNum < 1 || bedsNum > 12)) {
+        setError("Please enter a valid bed count between 1 and 12.");
+        return;
+      }
       if (roomId) {
         await roomService.update(roomId, {
           code: formCode,
-          monthlyRentPaise: Math.round(Number(formRent) * 100),
-          depositPaise: Math.round(Number(formDeposit) * 100),
+          monthlyRentPaise: Math.round(rentNum * 100),
+          depositPaise: Math.round(depositNum * 100),
         });
       } else {
         await roomService.create({
           organizationId: orgId,
           propertyId,
           code: formCode,
-          bedCount: Number(formBeds),
-          monthlyRentPaise: Math.round(Number(formRent) * 100),
-          depositPaise: Math.round(Number(formDeposit) * 100),
+          bedCount: bedsNum,
+          monthlyRentPaise: Math.round(rentNum * 100),
+          depositPaise: Math.round(depositNum * 100),
         });
       }
       await Promise.all([
@@ -79,16 +101,16 @@ export default function RoomSetup() {
           params: { id: propertyId },
         });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not add room.");
+      setError(toUserMessage(cause, roomId ? "Could not update room." : "Could not add room."));
     } finally {
       setSaving(false);
     }
   }
   const inputs = [
-    ["Room number or code", formCode, setCode, "default"],
-    ["Beds", formBeds, setBeds, "number-pad"],
-    ["Monthly rent (₹)", formRent, setRent, "decimal-pad"],
-    ["Deposit (₹)", formDeposit, setDeposit, "decimal-pad"],
+    ["Room number or code", code || existingRoom?.code || "", setCode, "default"],
+    ["Beds", beds || (existingRoom ? String(existingRoom.bedCount) : "1"), setBeds, "number-pad"],
+    ["Monthly rent (₹)", rent || (existingRoom ? String(existingRoom.monthlyRentPaise / 100) : "0"), setRent, "decimal-pad"],
+    ["Deposit (₹)", deposit || (existingRoom ? String(existingRoom.depositPaise / 100) : "0"), setDeposit, "decimal-pad"],
   ] as const;
   return (
     <Screen>
@@ -126,7 +148,7 @@ export default function RoomSetup() {
             </View>
           ))}
         {error ? (
-          <AppText style={{ color: colors.danger }}>{error}</AppText>
+          <AppText accessibilityRole="alert" style={{ color: colors.danger }}>{error}</AppText>
         ) : null}
         <PrimaryButton
           label={saving ? "Saving…" : roomId ? "Save room" : "Add room"}

@@ -92,11 +92,30 @@ export default function NoticesScreen() {
   async function publish() {
     setSaving(true);
     setError(null);
+    const trimmedTitle = title.trim();
+    const trimmedBody = body.trim();
+
+    if (!trimmedTitle || trimmedTitle.length < 3) {
+      setError("Please enter a notice title (at least 3 characters).");
+      setSaving(false);
+      return;
+    }
+    if (!trimmedBody || trimmedBody.length < 3) {
+      setError("Please enter notice content (at least 3 characters).");
+      setSaving(false);
+      return;
+    }
+    if (targetIds.length === 0) {
+      setError("Please select at least one recipient target for this notice.");
+      setSaving(false);
+      return;
+    }
+
     try {
       await noticeService.publish({
         organizationId: org,
-        title,
-        body,
+        title: trimmedTitle,
+        body: trimmedBody,
         isPinned: pinned,
         targetType,
         targetIds,

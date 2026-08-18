@@ -7,6 +7,7 @@ import { savePendingInvitation } from "@/shared/auth/pending-invitation";
 import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
 import { spacing, useTenantlyColors } from "@/shared/theme/tokens";
+import { toUserMessage } from "@/shared/errors/to-user-message";
 export default function AcceptInvitation() {
   const { token } = useLocalSearchParams<{ token: string }>();
   const { status, refreshSession } = useAuth();
@@ -21,16 +22,13 @@ export default function AcceptInvitation() {
       return;
     }
     setSaving(true);
+    setError(null);
     try {
       await invitationService.accept(token);
       await refreshSession();
       router.replace("/");
     } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Invitation could not be accepted.",
-      );
+      setError(toUserMessage(cause, "Invitation could not be accepted."));
     } finally {
       setSaving(false);
     }
@@ -43,7 +41,7 @@ export default function AcceptInvitation() {
         record.
       </AppText>
       {error ? (
-        <AppText style={{ color: colors.danger }}>{error}</AppText>
+        <AppText accessibilityRole="alert" style={{ color: colors.danger }}>{error}</AppText>
       ) : null}
       <PrimaryButton
         label={saving ? "Accepting…" : "Accept invitation"}

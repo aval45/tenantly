@@ -52,6 +52,22 @@ export default function PaymentProof() {
     if (!result.canceled) setAsset(result.assets[0] ?? null);
   }
   async function submit() {
+    const amountNum = parseFloat(amount.trim());
+    if (isNaN(amountNum) || amountNum <= 0) {
+      setError("Please enter a valid payment amount greater than 0.");
+      return;
+    }
+    const parsedAmountPaise = Math.round(amountNum * 100);
+    const balancePaise = Number.isFinite(maximumPaise) && maximumPaise > 0 ? maximumPaise : 0;
+    if (balancePaise > 0 && parsedAmountPaise > balancePaise) {
+      setError("Payment amount cannot exceed the remaining invoice balance.");
+      return;
+    }
+    if ((method === "upi" || method === "bank_transfer") && !asset) {
+      setError("Please attach a payment proof screenshot or receipt image.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
     let uploadedPath: string | undefined;
@@ -71,10 +87,10 @@ export default function PaymentProof() {
       }
       await billingService.submitPayment({
         invoiceId,
-        amountPaise: Math.round(Number(amount) * 100),
+        amountPaise: parsedAmountPaise,
         method,
         paidOn: localDateISO(),
-        reference,
+        reference: reference.trim() || undefined,
         proofPath: path,
         idempotencyKey,
       });

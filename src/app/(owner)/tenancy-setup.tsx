@@ -109,6 +109,36 @@ export default function TenancySetup() {
   async function save() {
     setSaving(true);
     setError(null);
+
+    if (!propertyId) {
+      setError("Please select a property for this tenancy.");
+      setSaving(false);
+      return;
+    }
+    if (!roomId) {
+      setError("Please select a room for this tenancy.");
+      setSaving(false);
+      return;
+    }
+    const rentNum = parseFloat(rent.trim());
+    if (isNaN(rentNum) || rentNum <= 0) {
+      setError("Please enter a valid monthly rent amount greater than 0.");
+      setSaving(false);
+      return;
+    }
+    const depositNum = parseFloat(deposit.trim());
+    if (isNaN(depositNum) || depositNum < 0) {
+      setError("Please enter a valid deposit amount (0 or more).");
+      setSaving(false);
+      return;
+    }
+    const dueDayNum = parseInt(dueDay.trim(), 10);
+    if (isNaN(dueDayNum) || dueDayNum < 1 || dueDayNum > 31) {
+      setError("Please enter a valid rent due day between 1 and 31.");
+      setSaving(false);
+      return;
+    }
+
     try {
       await residentService.createTenancy({
         organizationId: org,
@@ -117,9 +147,9 @@ export default function TenancySetup() {
         roomId,
         bedId,
         startDate: localDateISO(),
-        dueDay: Number(dueDay),
-        rentPaise: Math.round(Number(rent) * 100),
-        depositPaise: Math.round(Number(deposit) * 100),
+        dueDay: dueDayNum,
+        rentPaise: Math.round(rentNum * 100),
+        depositPaise: Math.round(depositNum * 100),
         idempotencyKey,
       });
       await Promise.all([

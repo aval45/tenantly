@@ -9,6 +9,7 @@ import { PrimaryButton } from "@/shared/components/primary-button";
 import { Screen } from "@/shared/components/screen";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
 import { queryKeys } from "@/shared/api/query-keys";
+import { toUserMessage } from "@/shared/errors/to-user-message";
 export default function ResidentSetup() {
   const { session } = useAuth();
   const router = useRouter();
@@ -22,12 +23,33 @@ export default function ResidentSetup() {
     return <Redirect href="/unauthorized" />;
   async function save() {
     setSaving(true);
+    setError(null);
+    const fullName = (values.fullName ?? "").trim();
+    const email = (values.email ?? "").trim().toLowerCase();
+    const phone = (values.phone ?? "").trim();
+
+    if (!fullName || fullName.length < 2) {
+      setError("Please enter the resident's full legal name (at least 2 characters).");
+      setSaving(false);
+      return;
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("Please enter a valid email address (e.g. name@example.com).");
+      setSaving(false);
+      return;
+    }
+    if (phone && !/^\+?[0-9]{10,15}$/.test(phone)) {
+      setError("Please enter a valid phone number with country code (e.g. +919876543210).");
+      setSaving(false);
+      return;
+    }
+
     try {
       const residentId = await residentService.create({
         organizationId: org,
-        fullName: values.fullName ?? "",
-        email: values.email,
-        phone: values.phone,
+        fullName,
+        email: email || undefined,
+        phone: phone || undefined,
       });
       await Promise.all([
         cache.invalidateQueries({
@@ -42,9 +64,7 @@ export default function ResidentSetup() {
         params: { residentId },
       });
     } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Could not add resident.",
-      );
+      setError(toUserMessage(cause, "Could not add resident."));
     } finally {
       setSaving(false);
     }
@@ -92,7 +112,7 @@ export default function ResidentSetup() {
         </View>
       ))}
       {error ? (
-        <AppText style={{ color: colors.danger }}>{error}</AppText>
+        <AppText accessibilityRole="alert" style={{ color: colors.danger }}>{error}</AppText>
       ) : null}
       <PrimaryButton
         label={saving ? "Saving…" : "Add resident"}

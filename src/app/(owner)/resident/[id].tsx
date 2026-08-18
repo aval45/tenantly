@@ -50,22 +50,47 @@ export default function ResidentDetail() {
   });
   const resident = query.data?.resident;
   const form = {
-    fullName: edits.fullName ?? resident?.full_name ?? "",
-    email: edits.email ?? resident?.email_normalized ?? "",
-    phone: edits.phone ?? resident?.phone_e164 ?? "",
-    emergencyName: edits.emergencyName ?? resident?.emergency_name ?? "",
-    emergencyPhone:
-      edits.emergencyPhone ?? resident?.emergency_phone_e164 ?? "",
+    fullName: (edits.fullName ?? resident?.full_name ?? "").trim(),
+    email: (edits.email ?? resident?.email_normalized ?? "").trim().toLowerCase(),
+    phone: (edits.phone ?? resident?.phone_e164 ?? "").trim(),
+    emergencyName: (edits.emergencyName ?? resident?.emergency_name ?? "").trim(),
+    emergencyPhone: (edits.emergencyPhone ?? resident?.emergency_phone_e164 ?? "").trim(),
   };
   async function save() {
     if (!resident) return;
     setSaving(true);
     setError(null);
     setNotice(null);
+
+    if (!form.fullName || form.fullName.length < 2) {
+      setError("Please enter the resident's full legal name (at least 2 characters).");
+      setSaving(false);
+      return;
+    }
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      setError("Please enter a valid email address (e.g. name@example.com).");
+      setSaving(false);
+      return;
+    }
+    if (form.phone && !/^\+?[0-9]{10,15}$/.test(form.phone)) {
+      setError("Please enter a valid phone number with country code (e.g. +919876543210).");
+      setSaving(false);
+      return;
+    }
+    if (form.emergencyPhone && !/^\+?[0-9]{10,15}$/.test(form.emergencyPhone)) {
+      setError("Please enter a valid emergency contact phone number with country code.");
+      setSaving(false);
+      return;
+    }
+
     try {
       await residentService.update(resident.id, {
         organizationId: resident.organization_id,
-        ...form,
+        fullName: form.fullName,
+        email: form.email || undefined,
+        phone: form.phone || undefined,
+        emergencyName: form.emergencyName || undefined,
+        emergencyPhone: form.emergencyPhone || undefined,
       });
       setNotice("Resident details saved.");
       await Promise.all([

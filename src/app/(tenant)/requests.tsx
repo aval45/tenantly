@@ -55,7 +55,21 @@ export default function TenantRequests() {
   }
   async function create() {
     const context = query.data?.context;
-    if (!context?.tenancy) return;
+    if (!context?.tenancy) {
+      setError("An active tenancy is required to submit a maintenance request.");
+      return;
+    }
+    const trimmedTitle = title.trim();
+    const trimmedDescription = description.trim();
+    if (!trimmedTitle || trimmedTitle.length < 3) {
+      setError("Please enter a request title (at least 3 characters).");
+      return;
+    }
+    if (!trimmedDescription || trimmedDescription.length < 5) {
+      setError("Please enter a description explaining the issue (at least 5 characters).");
+      return;
+    }
+
     setSaving(true);
     setError(null);
     let uploadedPath: string | null = null;
@@ -79,8 +93,8 @@ export default function TenantRequests() {
         tenancyId: context.tenancy.id,
         propertyId: context.tenancy.property_id,
         category: "general",
-        title,
-        description,
+        title: trimmedTitle,
+        description: trimmedDescription,
         priority: "normal",
         storagePath: uploadedPath ?? undefined,
         mediaType,

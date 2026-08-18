@@ -30,9 +30,14 @@ function ProfileScreen() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   async function save() {
+    const trimmedName = name.trim();
+    if (!trimmedName || trimmedName.length < 2) {
+      setError("Please enter your full name (at least 2 characters).");
+      return;
+    }
     const normalizedPhone = phone.trim();
     if (normalizedPhone && !/^\+?[0-9]{10,15}$/.test(normalizedPhone)) {
-      setError("Enter a valid phone number with country code.");
+      setError("Enter a valid phone number with country code (e.g. +919876543210).");
       return;
     }
     setSaving(true);
@@ -40,7 +45,7 @@ function ProfileScreen() {
     try {
       const { error } = await getSupabaseClient()
         .from("profiles")
-        .update({ full_name: name.trim(), phone_e164: normalizedPhone || null })
+        .update({ full_name: trimmedName, phone_e164: normalizedPhone || null })
         .eq("id", session?.userId ?? "");
       if (error) throw error;
       await refreshSession();

@@ -7,6 +7,7 @@ import { AuthLink } from "@/shared/components/auth-link";
 import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
 import { spacing, useTenantlyColors } from "@/shared/theme/tokens";
+import { toUserMessage } from "@/shared/errors/to-user-message";
 export default function VerifyEmailScreen() {
   const { email } = useLocalSearchParams<{ email?: string }>();
   const { resendSignUpConfirmation } = useAuth();
@@ -21,13 +22,11 @@ export default function VerifyEmailScreen() {
     setNotice(null);
     setError(null);
     try {
-      await resendSignUpConfirmation(email);
+      await resendSignUpConfirmation(email.trim().toLowerCase());
       setNotice("A new verification email was sent.");
     } catch (cause) {
       setError(
-        cause instanceof Error
-          ? cause.message
-          : "Could not resend the verification email.",
+        toUserMessage(cause, "Could not resend the verification email. Please try again."),
       );
     } finally {
       setSending(false);
