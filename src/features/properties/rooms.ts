@@ -61,7 +61,7 @@ export const roomService = {
         requested_organization_id: command.organizationId,
         requested_property_id: command.propertyId,
         requested_code: command.code,
-        requested_floor_label: command.floor ?? null,
+        requested_floor_label: command.floor ?? "",
         requested_room_type: command.bedCount > 1 ? "shared" : "private",
         requested_capacity: command.bedCount,
         requested_rent_paise: command.monthlyRentPaise,

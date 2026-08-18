@@ -76,7 +76,8 @@
     "supabase:stop": "supabase stop",
     "supabase:reset": "supabase db reset --local",
     "supabase:test": "supabase test db",
-    "supabase:types": "node scripts/generate-database-types.mjs"
+    "supabase:types": "node scripts/generate-database-types.mjs",
+    "supabase:types:linked": "node scripts/generate-database-types.mjs --linked"
   },
   "private": true
 }

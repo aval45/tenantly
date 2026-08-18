@@ -80,7 +80,7 @@ export const residentService = {
         requested_resident_id: input.residentId,
         requested_property_id: input.propertyId,
         requested_room_id: input.roomId,
-        requested_bed_id: input.bedId ?? null,
+        requested_bed_id: input.bedId ?? (null as never),
         requested_start_date: input.startDate,
         requested_due_day: input.dueDay,
         requested_rent_paise: input.rentPaise,
@@ -102,10 +102,10 @@ export const residentService = {
       "transfer_occupancy",
       {
         requested_tenancy_id: input.tenancyId,
-        requested_room_id: input.roomId,
-        requested_bed_id: input.bedId ?? null,
+        requested_room_id: input.roomId ?? (null as never),
+        requested_bed_id: input.bedId ?? (null as never),
         effective_at: new Date().toISOString(),
-        transfer_reason: input.reason ?? null,
+        transfer_reason: input.reason ?? "",
         request_idempotency_key: input.idempotencyKey,
       },
     );

@@ -127,7 +127,7 @@ export default function TenantPayments() {
                 </AppText>
               </View>
               <AppText variant="label">
-                {formatMoney(row.item.balance_paise)}
+                {formatMoney(row.item.balance_paise ?? 0)}
               </AppText>
               <ChevronRight size={18} color={colors.textMuted} />
             </Pressable>

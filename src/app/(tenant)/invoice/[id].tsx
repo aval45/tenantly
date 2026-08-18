@@ -35,6 +35,7 @@ export default function InvoiceDetail() {
     enabled: !!id,
   });
   const invoice = query.data?.invoice;
+  const balancePaise = invoice?.balance_paise ?? 0;
   if (query.isLoading)
     return (
       <Screen>
@@ -79,12 +80,10 @@ export default function InvoiceDetail() {
         ))}
         <View style={[s.total, { borderTopColor: colors.border }]}>
           <AppText variant="section">Balance</AppText>
-          <AppText variant="section">
-            {formatMoney(invoice?.balance_paise ?? 0)}
-          </AppText>
+          <AppText variant="section">{formatMoney(balancePaise)}</AppText>
         </View>
       </View>
-      {invoice && invoice.balance_paise > 0 ? (
+      {invoice && balancePaise > 0 ? (
         <PrimaryButton
           label="Submit payment proof"
           onPress={() =>
@@ -92,7 +91,7 @@ export default function InvoiceDetail() {
               pathname: "/(tenant)/payment-proof" as never,
               params: {
                 invoiceId: invoice.id,
-                amountPaise: String(invoice.balance_paise),
+                amountPaise: String(balancePaise),
               },
             })
           }

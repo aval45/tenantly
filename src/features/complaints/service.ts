@@ -32,6 +32,9 @@ export const complaintService = {
   ) {
     const value = complaintSchema.parse(input);
     if (!value.tenancyId) throw new Error("tenancy_required");
+    if (Boolean(input.storagePath) !== Boolean(input.mediaType)) {
+      throw new Error("invalid_attachment");
+    }
     const { data, error } = await getSupabaseClient().rpc(
       "create_complaint_with_attachment",
       {
@@ -40,8 +43,12 @@ export const complaintService = {
         requested_priority: value.priority,
         requested_title: value.title,
         requested_description: value.description,
-        requested_storage_path: input.storagePath ?? null,
-        requested_media_type: input.mediaType ?? null,
+        ...(input.storagePath
+          ? {
+              requested_storage_path: input.storagePath,
+              requested_media_type: input.mediaType,
+            }
+          : {}),
       },
     );
     if (error) throw error;
@@ -53,7 +60,7 @@ export const complaintService = {
       {
         requested_complaint_id: id,
         requested_status: status,
-        transition_note: note ?? null,
+        transition_note: note ?? "",
       },
     );
     if (error) throw error;

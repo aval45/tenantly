@@ -13,14 +13,14 @@ export const paymentSubmissionSchema = z.object({
 });
 
 export function summarizeInvoices<
-  T extends { balance_paise: number; due_date: string },
+  T extends { balance_paise: number | null; due_date: string },
 >(invoices: T[]) {
   const actionable = invoices
-    .filter((invoice) => invoice.balance_paise > 0)
+    .filter((invoice) => (invoice.balance_paise ?? 0) > 0)
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
   return {
     outstandingPaise: actionable.reduce(
-      (sum, invoice) => sum + invoice.balance_paise,
+      (sum, invoice) => sum + (invoice.balance_paise ?? 0),
       0,
     ),
     nextInvoice: actionable[0],
@@ -28,12 +28,12 @@ export function summarizeInvoices<
 }
 
 export function buildPaymentAllocations<
-  T extends { id: string; balance_paise: number },
+  T extends { id: string; balance_paise: number | null },
 >(amountPaise: number, invoices: T[]) {
   let remaining = amountPaise;
   const allocations = invoices.flatMap((invoice) => {
     if (remaining <= 0) return [];
-    const amount = Math.min(remaining, invoice.balance_paise);
+    const amount = Math.min(remaining, invoice.balance_paise ?? 0);
     remaining -= amount;
     return amount > 0 ? [{ invoiceId: invoice.id, amountPaise: amount }] : [];
   });
@@ -123,8 +123,8 @@ export const billingService = {
       requested_amount_paise: value.amountPaise,
       requested_method: value.method as PaymentMethod,
       requested_paid_on: value.paidOn,
-      requested_reference: value.reference ?? null,
-      requested_proof_path: value.proofPath ?? null,
+      requested_reference: value.reference ?? "",
+      requested_proof_path: value.proofPath ?? "",
       request_idempotency_key: value.idempotencyKey,
     });
     if (error) throw error;
@@ -175,7 +175,7 @@ export const billingService = {
     const { data, error } = await getSupabaseClient().rpc("decide_payment", {
       requested_payment_id: paymentId,
       approve,
-      reason,
+      reason: reason ?? "",
       allocations: allocations as unknown as Json,
     });
     if (error) throw error;

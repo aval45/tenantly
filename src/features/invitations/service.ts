@@ -23,7 +23,7 @@ export const invitationService = {
     const value = invitationSchema.parse(input);
     const { data, error } = await getSupabaseClient().rpc("create_invitation", {
       requested_organization_id: value.organizationId,
-      requested_resident_id: value.residentId ?? null,
+      requested_resident_id: value.residentId ?? (null as never),
       requested_role: value.role,
       requested_email: value.email,
       requested_property_ids: value.propertyIds,
