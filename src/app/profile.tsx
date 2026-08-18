@@ -1,7 +1,9 @@
 import { Redirect } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
+import { useQueryClient } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/shared/api/supabase";
+import { queryKeys } from "@/shared/api/query-keys";
 import { useAuth } from "@/shared/auth/auth-provider";
 import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
@@ -21,6 +23,7 @@ export default function ProfileRoute() {
 function ProfileScreen() {
   const { session, refreshSession } = useAuth();
   const colors = useTenantlyColors();
+  const cache = useQueryClient();
   const [name, setName] = useState(session?.profile.fullName ?? "");
   const [phone, setPhone] = useState(session?.profile.phone ?? "");
   const [saving, setSaving] = useState(false);
@@ -41,6 +44,20 @@ function ProfileScreen() {
         .eq("id", session?.userId ?? "");
       if (error) throw error;
       await refreshSession();
+      await Promise.all([
+        cache.invalidateQueries({
+          queryKey: queryKeys.ownerDashboard(
+            session?.userId ?? "",
+            session?.activeOrganizationId ?? "",
+          ),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.tenantMore(
+            session?.userId ?? "",
+            session?.activeOrganizationId ?? "",
+          ),
+        }),
+      ]);
       setNotice("Profile updated.");
     } catch (cause) {
       setError(toUserMessage(cause, "Your profile could not be updated."));

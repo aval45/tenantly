@@ -1,7 +1,8 @@
-import { Link, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 
 import { useAuth } from "@/shared/auth/auth-provider";
+import { AuthLink } from "@/shared/components/auth-link";
 import { AuthFormScreen } from "@/shared/components/auth-form-screen";
 
 export default function RegisterScreen() {
@@ -56,7 +57,9 @@ export default function RegisterScreen() {
         }
       }}
       footer={
-        <Link href={"/(auth)/login" as never}>Already have an account?</Link>
+        <AuthLink href={"/(auth)/login" as never}>
+          Already have an account?
+        </AuthLink>
       }
     />
   );

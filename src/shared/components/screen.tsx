@@ -12,6 +12,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppText } from "./app-text";
 import { NavigationBar } from "./navigation-bar";
+import {
+  getRoleGroup,
+  getScreenDestination,
+  isPrimaryRoute,
+  shouldShowTaskbar,
+} from "./screen-navigation";
 import { useAuth } from "@/shared/auth/auth-provider";
 import { motion } from "@/shared/theme/motion";
 import { spacing, useTenantlyColors } from "@/shared/theme/tokens";
@@ -32,45 +38,11 @@ export function Screen({
   const { activeMembership } = useAuth();
   const { width } = useWindowDimensions();
   const horizontalPadding = width >= 700 ? spacing.lg : spacing.content;
-  const primaryRoutes = new Set([
-    "/",
-    "/properties",
-    "/rent",
-    "/more",
-    "/payments",
-    "/requests",
-  ]);
-  const globalTaskbarRoutes = ["/profile", "/organizations", "/notifications"];
-  const showTaskbar = globalTaskbarRoutes.includes(pathname);
-  const roleGroup =
-    activeMembership?.role === "tenant" ? "/(tenant)" : "/(owner)";
-  const destinations: Record<string, { href: string; label: string }> = {
-    "/profile": { href: roleGroup + "/more", label: "More" },
-    "/organizations": { href: roleGroup + "/more", label: "More" },
-    "/notifications": { href: roleGroup, label: "Home" },
-    "/residents": { href: "/(owner)/more", label: "More" },
-    "/complaints": { href: "/(owner)/more", label: "More" },
-    "/notices": { href: "/(owner)/more", label: "More" },
-    "/reports": { href: "/(owner)/more", label: "More" },
-    "/invite": { href: "/(owner)/more", label: "More" },
-    "/resident-setup": { href: "/(owner)/residents", label: "Residents" },
-    "/tenancy-setup": { href: "/(owner)/residents", label: "Residents" },
-    "/occupancy-manage": {
-      href: "/(owner)/residents",
-      label: "Residents",
-    },
-    "/property-setup": { href: "/(owner)/properties", label: "Properties" },
-    "/room-setup": { href: "/(owner)/properties", label: "Properties" },
-    "/payment-proof": { href: "/(tenant)/payments", label: "Payments" },
-  };
-  const dynamicDestination = pathname.startsWith("/payment/")
-    ? { href: "/(owner)/rent", label: "Rent" }
-    : pathname.startsWith("/invoice/")
-      ? { href: "/(tenant)/payments", label: "Payments" }
-      : undefined;
-  const destination = dynamicDestination ?? destinations[pathname];
-  const showBack =
-    !primaryRoutes.has(pathname) && !pathname.startsWith("/property/");
+  const role = activeMembership?.role;
+  const roleGroup = getRoleGroup(role);
+  const showTaskbar = shouldShowTaskbar(pathname);
+  const destination = getScreenDestination(pathname, role);
+  const showBack = !isPrimaryRoute(pathname);
   const goBack = () => {
     if (router.canGoBack()) router.back();
     else router.replace((destination?.href ?? roleGroup) as never);

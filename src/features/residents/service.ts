@@ -42,6 +42,20 @@ export const residentService = {
     if (error) throw error;
     return data.id;
   },
+  async update(id: string, input: z.input<typeof createResidentCommandSchema>) {
+    const value = createResidentCommandSchema.parse(input);
+    const { error } = await getSupabaseClient()
+      .from("residents")
+      .update({
+        full_name: value.fullName,
+        email_normalized: value.email ? value.email.toLowerCase() : null,
+        phone_e164: value.phone || null,
+        emergency_name: value.emergencyName || null,
+        emergency_phone_e164: value.emergencyPhone || null,
+      })
+      .eq("id", id);
+    if (error) throw error;
+  },
   async list(organizationId: string) {
     const { data, error } = await getSupabaseClient()
       .from("residents")

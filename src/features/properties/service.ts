@@ -87,6 +87,21 @@ export const propertyService = {
     if (error) throw error;
     return data.id;
   },
+  async update(id: string, input: CreatePropertyCommand) {
+    const command = createPropertyCommandSchema.parse(input);
+    const { error } = await getSupabaseClient()
+      .from("properties")
+      .update({
+        name: command.name,
+        property_type: command.propertyType,
+        address_line_1: command.addressLine1,
+        city: command.city,
+        state: command.state,
+        postal_code: command.postalCode,
+      })
+      .eq("id", id);
+    if (error) throw error;
+  },
   async archive(id: string) {
     const { error } = await getSupabaseClient()
       .from("properties")

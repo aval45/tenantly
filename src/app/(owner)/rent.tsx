@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { CalendarPlus, ChevronRight, ReceiptText } from "lucide-react-native";
-import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { Alert, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { billingService } from "@/features/billing/service";
 import { useAuth } from "@/shared/auth/auth-provider";
 import { AppText } from "@/shared/components/app-text";
@@ -19,22 +19,36 @@ export default function RentScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { session } = useAuth();
+  const userId = session?.userId ?? "";
   const organizationId = session?.activeOrganizationId ?? "";
   const query = useQuery({
     queryKey: [
-      ...queryKeys.payments(session?.userId ?? "", organizationId),
+      ...queryKeys.payments(userId, organizationId),
       "pending",
     ],
     queryFn: () => billingService.listPendingPayments(organizationId),
+    enabled: !!organizationId,
+  });
+  const invoices = useQuery({
+    queryKey: queryKeys.invoices(userId, organizationId),
+    queryFn: () => billingService.listInvoices(organizationId),
     enabled: !!organizationId,
   });
   const month = localMonthStartISO();
   const generate = useMutation({
     mutationFn: () => billingService.generateMonth(organizationId, month),
     onSuccess: () =>
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.invoices(session?.userId ?? "", organizationId),
-      }),
+      void Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.invoices(userId, organizationId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.ownerDashboard(userId, organizationId),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.payments(userId, organizationId),
+        }),
+      ]),
   });
   function confirmGeneration() {
     Alert.alert(
@@ -46,8 +60,19 @@ export default function RentScreen() {
       ],
     );
   }
+  const isRefetching = query.isRefetching || invoices.isRefetching;
   return (
-    <Screen>
+    <Screen
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefetching}
+          onRefresh={() =>
+            void Promise.all([query.refetch(), invoices.refetch()])
+          }
+          tintColor={colors.primary}
+        />
+      }
+    >
       <View style={s.header}>
         <AppText variant="heading">Rent</AppText>
         <AppText muted>
@@ -127,6 +152,49 @@ export default function RentScreen() {
           ))}
         </View>
       )}
+      <AppText variant="section" style={s.title}>
+        Invoice ledger
+      </AppText>
+      {invoices.isLoading ? <LoadingSkeleton /> : null}
+      {invoices.isError ? (
+        <StateView
+          kind="error"
+          title="Invoices unavailable"
+          body="The invoice ledger could not be loaded."
+          actionLabel="Retry"
+          onAction={() => void invoices.refetch()}
+        />
+      ) : null}
+      {!invoices.isLoading && !invoices.isError && !invoices.data?.length ? (
+        <AppText muted>No invoices generated yet.</AppText>
+      ) : null}
+      <View style={[s.list, { borderColor: colors.border }]}>
+        {invoices.data?.map((invoice) => (
+          <Pressable
+            key={invoice.id}
+            accessibilityRole="button"
+            onPress={() =>
+              router.push({
+                pathname: "/(owner)/invoice/[id]" as never,
+                params: { id: invoice.id },
+              })
+            }
+            style={[s.row, { borderBottomColor: colors.border }]}
+          >
+            <View style={{ flex: 1 }}>
+              <AppText variant="label">{invoice.invoice_number}</AppText>
+              <AppText variant="caption" muted>
+                {invoice.status.replace("_", " ")} · due{" "}
+                {formatDate(invoice.due_date)}
+              </AppText>
+            </View>
+            <AppText variant="label">
+              {formatMoney(invoice.balance_paise ?? 0)}
+            </AppText>
+            <ChevronRight size={18} color={colors.textMuted} />
+          </Pressable>
+        ))}
+      </View>
     </Screen>
   );
 }

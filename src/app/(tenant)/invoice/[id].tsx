@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { StyleSheet, View } from "react-native";
+import { RefreshControl, StyleSheet, View } from "react-native";
 import { getSupabaseClient } from "@/shared/api/supabase";
 import { queryKeys } from "@/shared/api/query-keys";
 import { useAuth } from "@/shared/auth/auth-provider";
@@ -55,7 +55,15 @@ export default function InvoiceDetail() {
       </Screen>
     );
   return (
-    <Screen>
+    <Screen
+      refreshControl={
+        <RefreshControl
+          refreshing={query.isRefetching}
+          onRefresh={() => void query.refetch()}
+          tintColor={colors.primary}
+        />
+      }
+    >
       <View style={s.header}>
         <AppText variant="eyebrow" style={{ color: colors.accent }}>
           INVOICE

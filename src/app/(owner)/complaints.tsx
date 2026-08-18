@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import {
   FlatList,
   Pressable,
@@ -29,6 +30,7 @@ const next: Partial<Record<ComplaintStatus, ComplaintStatus>> = {
 };
 export default function ComplaintsScreen() {
   const { session } = useAuth();
+  const router = useRouter();
   const colors = useTenantlyColors();
   const cache = useQueryClient();
   const org = session?.activeOrganizationId ?? "";
@@ -46,9 +48,17 @@ export default function ComplaintsScreen() {
     setActionError(null);
     try {
       await complaintService.transition(id, value);
-      await cache.invalidateQueries({
-        queryKey: queryKeys.complaints(session?.userId ?? "", org),
-      });
+      await Promise.all([
+        cache.invalidateQueries({
+          queryKey: queryKeys.complaints(session?.userId ?? "", org),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.ownerDashboard(session?.userId ?? "", org),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.maintenanceTasks(session?.userId ?? "", org),
+        }),
+      ]);
     } catch (cause) {
       setActionError(
         toUserMessage(cause, "The request status could not be updated."),
@@ -112,7 +122,16 @@ export default function ComplaintsScreen() {
           />
         }
         renderItem={({ item }) => (
-          <View style={[s.row, { borderColor: colors.border }]}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() =>
+              router.push({
+                pathname: "/(owner)/complaint/[id]" as never,
+                params: { id: item.id },
+              })
+            }
+            style={[s.row, { borderColor: colors.border }]}
+          >
             <View style={{ flex: 1, gap: 3 }}>
               <AppText variant="label">{item.title}</AppText>
               <AppText variant="caption" muted>
@@ -135,7 +154,7 @@ export default function ComplaintsScreen() {
                 </AppText>
               </Pressable>
             ) : null}
-          </View>
+          </Pressable>
         )}
       />
     </Screen>

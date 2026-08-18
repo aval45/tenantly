@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Redirect } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import {
   FlatList,
   Pressable,
@@ -32,6 +32,7 @@ function NotificationsScreen() {
   const { session } = useAuth();
   const colors = useTenantlyColors();
   const cache = useQueryClient();
+  const router = useRouter();
   const query = useQuery({
     queryKey: queryKeys.notifications(session?.userId ?? ""),
     queryFn: async () => {
@@ -44,7 +45,7 @@ function NotificationsScreen() {
     },
     enabled: !!session,
   });
-  async function markRead(id: string) {
+  async function markRead(id: string, deepLinkPath: string | null) {
     const { error } = await getSupabaseClient()
       .from("notifications")
       .update({ read_at: new Date().toISOString() })
@@ -53,6 +54,8 @@ function NotificationsScreen() {
     await cache.invalidateQueries({
       queryKey: queryKeys.notifications(session?.userId ?? ""),
     });
+    if (deepLinkPath && deepLinkPath.startsWith("/"))
+      router.push(deepLinkPath as never);
   }
   if (query.isLoading)
     return (
@@ -101,7 +104,7 @@ function NotificationsScreen() {
         renderItem={({ item }) => (
           <Pressable
             accessibilityRole="button"
-            onPress={() => void markRead(item.id)}
+            onPress={() => void markRead(item.id, item.deep_link_path)}
             style={[
               s.item,
               {

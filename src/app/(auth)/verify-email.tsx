@@ -1,8 +1,9 @@
-import { Link, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { MailCheck } from "lucide-react-native";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useAuth } from "@/shared/auth/auth-provider";
+import { AuthLink } from "@/shared/components/auth-link";
 import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
 import { spacing, useTenantlyColors } from "@/shared/theme/tokens";
@@ -56,7 +57,7 @@ export default function VerifyEmailScreen() {
           onPress={() => void resend()}
         />
       ) : null}
-      <Link href="/(auth)/login">Return to sign in</Link>
+      <AuthLink href="/(auth)/login">Return to sign in</AuthLink>
     </View>
   );
 }

@@ -4,7 +4,7 @@ export const invitationSchema = z
   .object({
     organizationId: z.string().uuid(),
     residentId: z.string().uuid().optional(),
-    role: z.enum(["manager", "tenant"]),
+    role: z.enum(["manager", "maintenance_staff", "tenant"]),
     email: z.email(),
     propertyIds: z.array(z.uuid()).default([]),
   })
@@ -15,7 +15,7 @@ export const invitationSchema = z
         : !value.residentId && value.propertyIds.length > 0,
     {
       message:
-        "Tenant invitations require a resident; manager invitations require assigned properties.",
+        "Tenant invitations require a resident; operator invitations require assigned properties.",
     },
   );
 export const invitationService = {

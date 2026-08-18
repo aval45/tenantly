@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Linking, Pressable, StyleSheet, View } from "react-native";
+import { Linking, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { getTenantContext } from "@/features/tenant/api";
 import { getSupabaseClient } from "@/shared/api/supabase";
 import { useAuth } from "@/shared/auth/auth-provider";
@@ -40,6 +40,19 @@ export default function TenantMore() {
     await Linking.openURL(data.signedUrl);
   }
   const tenancy = query.data?.context.tenancy;
+  const currentAgreementIds = new Set<string>();
+  const agreementResidents = new Set<string>();
+  for (const agreement of (query.data?.documents ?? [])
+    .filter((item) => item.document_type === "agreement")
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))) {
+    if (
+      agreement.resident_id &&
+      !agreementResidents.has(agreement.resident_id)
+    ) {
+      agreementResidents.add(agreement.resident_id);
+      currentAgreementIds.add(agreement.id);
+    }
+  }
   if (query.isLoading)
     return (
       <Screen>
@@ -59,7 +72,15 @@ export default function TenantMore() {
       </Screen>
     );
   return (
-    <Screen>
+    <Screen
+      refreshControl={
+        <RefreshControl
+          refreshing={query.isRefetching}
+          onRefresh={() => void query.refetch()}
+          tintColor={colors.primary}
+        />
+      }
+    >
       <View style={s.header}>
         <AppText variant="heading">More</AppText>
         <AppText muted>
@@ -108,7 +129,9 @@ export default function TenantMore() {
               {item.document_type.replace("_", " ")}
             </AppText>
             <AppText variant="caption" muted>
-              {item.verification_status}
+              {item.document_type === "agreement"
+                ? `${currentAgreementIds.has(item.id) ? "Current agreement" : "Previous version"} · ${item.expires_on ? `expires ${formatDate(item.expires_on)}` : "no expiry date"}`
+                : item.verification_status}
             </AppText>
           </Pressable>
         ))

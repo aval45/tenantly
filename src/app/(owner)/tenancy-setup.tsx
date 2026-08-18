@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
@@ -60,8 +60,10 @@ export default function TenancySetup() {
   const { residentId } = useLocalSearchParams<{ residentId: string }>();
   const { session } = useAuth();
   const router = useRouter();
+  const cache = useQueryClient();
   const colors = useTenantlyColors();
   const org = session?.activeOrganizationId ?? "";
+  const userId = session?.userId ?? "";
   const [propertyId, setPropertyId] = useState("");
   const [roomId, setRoomId] = useState("");
   const [bedId, setBedId] = useState<string | undefined>();
@@ -74,17 +76,17 @@ export default function TenancySetup() {
     () => `tenancy-${residentId}-${Crypto.randomUUID()}`,
   );
   const properties = useQuery({
-    queryKey: queryKeys.properties(session?.userId ?? "", org),
+    queryKey: queryKeys.properties(userId, org),
     queryFn: () => propertyService.list(org),
     enabled: !!org,
   });
   const rooms = useQuery({
-    queryKey: queryKeys.rooms(session?.userId ?? "", org, propertyId),
+    queryKey: queryKeys.rooms(userId, org, propertyId),
     queryFn: () => roomService.listForProperty(propertyId),
     enabled: !!propertyId,
   });
   const beds = useQuery({
-    queryKey: queryKeys.beds(session?.userId ?? "", org, roomId),
+    queryKey: queryKeys.beds(userId, org, roomId),
     queryFn: async () => {
       const client = getSupabaseClient();
       const { data, error } = await client
@@ -120,7 +122,38 @@ export default function TenancySetup() {
         depositPaise: Math.round(Number(deposit) * 100),
         idempotencyKey,
       });
-      router.back();
+      await Promise.all([
+        cache.invalidateQueries({
+          queryKey: queryKeys.residents(userId, org),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.properties(userId, org),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.property(userId, org, propertyId),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.rooms(userId, org, propertyId),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.ownerDashboard(userId, org),
+        }),
+        cache.invalidateQueries({
+          queryKey: [
+            "tenantly",
+            "resident",
+            userId,
+            org,
+            residentId,
+          ],
+        }),
+      ]);
+      if (router.canGoBack()) router.back();
+      else
+        router.replace({
+          pathname: "/(owner)/resident/[id]" as never,
+          params: { id: residentId },
+        });
     } catch (cause) {
       setError(toUserMessage(cause, "Could not create tenancy."));
     } finally {
@@ -206,9 +239,7 @@ export default function TenancySetup() {
       ) : null}
       <PrimaryButton
         label={saving ? "Creating…" : "Create tenancy"}
-        isDisabled={
-          saving || !roomId || ((beds.data?.length ?? 0) > 0 && !bedId)
-        }
+        isDisabled={saving || !roomId}
         onPress={() => void save()}
       />
     </Screen>

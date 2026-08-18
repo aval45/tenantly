@@ -17,6 +17,7 @@ export type AppCapabilities = {
   operateProperties: boolean;
   approvePayments: boolean;
   publishOrganizationNotices: boolean;
+  workMaintenanceTasks: boolean;
 };
 
 export const noCapabilities: AppCapabilities = {
@@ -26,6 +27,7 @@ export const noCapabilities: AppCapabilities = {
   operateProperties: false,
   approvePayments: false,
   publishOrganizationNotices: false,
+  workMaintenanceTasks: false,
 };
 
 export function capabilitiesFor(
@@ -39,12 +41,18 @@ export function capabilitiesFor(
       operateProperties: true,
       approvePayments: true,
       publishOrganizationNotices: true,
+      workMaintenanceTasks: false,
     };
   if (role === "manager")
     return {
       ...noCapabilities,
       operateProperties: true,
       approvePayments: true,
+    };
+  if (role === "maintenance_staff")
+    return {
+      ...noCapabilities,
+      workMaintenanceTasks: true,
     };
   return noCapabilities;
 }

@@ -114,6 +114,10 @@ export default function OwnerTabsLayout() {
       <Tabs.Screen name="notices" options={{ href: null }} />
       <Tabs.Screen name="reports" options={{ href: null }} />
       <Tabs.Screen name="invite" options={{ href: null }} />
+      <Tabs.Screen name="operations" options={{ href: null }} />
+      <Tabs.Screen name="invoice/[id]" options={{ href: null }} />
+      <Tabs.Screen name="complaint/[id]" options={{ href: null }} />
+      <Tabs.Screen name="resident/[id]" options={{ href: null }} />
     </Tabs>
   );
 }

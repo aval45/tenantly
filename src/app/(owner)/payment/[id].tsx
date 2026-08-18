@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, StyleSheet, TextInput, View } from "react-native";
+import { Alert, RefreshControl, StyleSheet, TextInput, View } from "react-native";
 import { Image } from "expo-image";
 import {
   billingService,
@@ -96,27 +96,27 @@ export default function PaymentDetail() {
         reason || null,
         allocations,
       );
-      await clientCache.invalidateQueries({
-        queryKey: queryKeys.payments(
-          session?.userId ?? "",
-          session?.activeOrganizationId ?? "",
-        ),
-      });
+      const userId = session?.userId ?? "";
+      const orgId = session?.activeOrganizationId ?? "";
       await Promise.all([
         clientCache.invalidateQueries({
-          queryKey: queryKeys.invoices(
-            session?.userId ?? "",
-            session?.activeOrganizationId ?? "",
-          ),
+          queryKey: queryKeys.payments(userId, orgId),
         }),
         clientCache.invalidateQueries({
-          queryKey: queryKeys.ownerDashboard(
-            session?.userId ?? "",
-            session?.activeOrganizationId ?? "",
-          ),
+          queryKey: queryKeys.invoices(userId, orgId),
+        }),
+        clientCache.invalidateQueries({
+          queryKey: queryKeys.ownerDashboard(userId, orgId),
+        }),
+        clientCache.invalidateQueries({
+          queryKey: queryKeys.tenantDashboard(userId, orgId),
+        }),
+        clientCache.invalidateQueries({
+          queryKey: queryKeys.payment(userId, orgId, id),
         }),
       ]);
-      router.back();
+      if (router.canGoBack()) router.back();
+      else router.replace("/(owner)/rent" as never);
     } catch (cause) {
       Alert.alert("Decision failed", toUserMessage(cause, "Try again."));
     } finally {
@@ -158,7 +158,15 @@ export default function PaymentDetail() {
       </Screen>
     );
   return (
-    <Screen>
+    <Screen
+      refreshControl={
+        <RefreshControl
+          refreshing={query.isRefetching}
+          onRefresh={() => void query.refetch()}
+          tintColor={colors.primary}
+        />
+      }
+    >
       <View style={s.header}>
         <AppText variant="eyebrow" style={{ color: colors.accent }}>
           PAYMENT REVIEW

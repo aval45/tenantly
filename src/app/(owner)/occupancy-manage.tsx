@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Crypto from "expo-crypto";
 import { useState } from "react";
@@ -6,6 +6,7 @@ import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { propertyService } from "@/features/properties/service";
 import { roomService } from "@/features/properties/rooms";
 import { residentService } from "@/features/residents/service";
+import { getSupabaseClient } from "@/shared/api/supabase";
 import { useAuth } from "@/shared/auth/auth-provider";
 import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
@@ -21,23 +22,49 @@ export default function OccupancyManageScreen() {
   }>();
   const { session } = useAuth();
   const router = useRouter();
+  const cache = useQueryClient();
   const colors = useTenantlyColors();
   const [propertyId, setPropertyId] = useState("");
   const [roomId, setRoomId] = useState("");
+  const [bedId, setBedId] = useState<string | undefined>();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [transferKey] = useState(() => Crypto.randomUUID());
   const [vacateKey] = useState(() => Crypto.randomUUID());
   const org = session?.activeOrganizationId ?? "";
+  const userId = session?.userId ?? "";
   const properties = useQuery({
-    queryKey: queryKeys.properties(session?.userId ?? "", org),
+    queryKey: queryKeys.properties(userId, org),
     queryFn: () => propertyService.list(org),
     enabled: !!org,
   });
   const rooms = useQuery({
-    queryKey: queryKeys.rooms(session?.userId ?? "", org, propertyId),
+    queryKey: queryKeys.rooms(userId, org, propertyId),
     queryFn: () => roomService.listForProperty(propertyId),
     enabled: !!propertyId,
+  });
+  const beds = useQuery({
+    queryKey: queryKeys.beds(userId, org, roomId),
+    queryFn: async () => {
+      const client = getSupabaseClient();
+      const [bedRows, occupancy] = await Promise.all([
+        client
+          .from("beds")
+          .select("*")
+          .eq("room_id", roomId)
+          .eq("status", "active"),
+        client
+          .from("occupancy_assignments")
+          .select("bed_id")
+          .eq("room_id", roomId)
+          .is("ends_at", null),
+      ]);
+      if (bedRows.error) throw bedRows.error;
+      if (occupancy.error) throw occupancy.error;
+      const occupied = new Set(occupancy.data.map((item) => item.bed_id));
+      return bedRows.data.filter((bed) => !occupied.has(bed.id));
+    },
+    enabled: !!roomId,
   });
   async function transfer() {
     setSaving(true);
@@ -46,10 +73,29 @@ export default function OccupancyManageScreen() {
       await residentService.transferOrVacate({
         tenancyId,
         roomId,
+        bedId,
         reason: "Owner transfer",
         idempotencyKey: transferKey,
       });
-      router.back();
+      await Promise.all([
+        cache.invalidateQueries({
+          queryKey: queryKeys.residents(userId, org),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.properties(userId, org),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.rooms(userId, org, propertyId),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.ownerDashboard(userId, org),
+        }),
+        cache.invalidateQueries({
+          queryKey: ["tenantly", "resident"],
+        }),
+      ]);
+      if (router.canGoBack()) router.back();
+      else router.replace("/(owner)/residents" as never);
     } catch (cause) {
       setError(toUserMessage(cause, "Resident could not be transferred."));
     } finally {
@@ -65,21 +111,37 @@ export default function OccupancyManageScreen() {
         {
           text: "Vacate",
           style: "destructive",
-          onPress: () => {
+          onPress: async () => {
             setSaving(true);
             setError(null);
-            void residentService
-              .transferOrVacate({
+            try {
+              await residentService.transferOrVacate({
                 tenancyId,
                 roomId: null,
                 reason: "Owner recorded move-out",
                 idempotencyKey: vacateKey,
-              })
-              .then(() => router.back())
-              .catch((cause) =>
-                setError(toUserMessage(cause, "Tenancy could not be ended.")),
-              )
-              .finally(() => setSaving(false));
+              });
+              await Promise.all([
+                cache.invalidateQueries({
+                  queryKey: queryKeys.residents(userId, org),
+                }),
+                cache.invalidateQueries({
+                  queryKey: queryKeys.properties(userId, org),
+                }),
+                cache.invalidateQueries({
+                  queryKey: queryKeys.ownerDashboard(userId, org),
+                }),
+                cache.invalidateQueries({
+                  queryKey: ["tenantly", "resident"],
+                }),
+              ]);
+              if (router.canGoBack()) router.back();
+              else router.replace("/(owner)/residents" as never);
+            } catch (cause) {
+              setError(toUserMessage(cause, "Tenancy could not be ended."));
+            } finally {
+              setSaving(false);
+            }
           },
         },
       ],
@@ -102,6 +164,7 @@ export default function OccupancyManageScreen() {
             onPress={() => {
               setPropertyId(item.id);
               setRoomId("");
+              setBedId(undefined);
             }}
             style={[
               s.choice,
@@ -127,7 +190,10 @@ export default function OccupancyManageScreen() {
               accessibilityRole="radio"
               accessibilityState={{ selected: item.id === roomId }}
               aria-checked={item.id === roomId}
-              onPress={() => setRoomId(item.id)}
+              onPress={() => {
+                setRoomId(item.id);
+                setBedId(undefined);
+              }}
               style={[
                 s.choice,
                 {
@@ -140,6 +206,32 @@ export default function OccupancyManageScreen() {
             </Pressable>
           ))}
       </View>
+      {(beds.data?.length ?? 0) > 0 ? (
+        <>
+          <AppText variant="label" style={s.label}>
+            Bed (optional)
+          </AppText>
+          <View style={s.choices}>
+            {beds.data?.map((bed) => (
+              <Pressable
+                key={bed.id}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: bedId === bed.id }}
+                onPress={() => setBedId(bed.id)}
+                style={[
+                  s.choice,
+                  {
+                    borderColor:
+                      bedId === bed.id ? colors.accent : colors.border,
+                  },
+                ]}
+              >
+                <AppText variant="caption">{bed.code}</AppText>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      ) : null}
       <View style={s.actions}>
         {error ? (
           <AppText accessibilityRole="alert" style={{ color: colors.danger }}>

@@ -1,8 +1,9 @@
-import { Link, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 
 import { useAuth } from "@/shared/auth/auth-provider";
 import { takePendingInvitation } from "@/shared/auth/pending-invitation";
+import { AuthLink } from "@/shared/components/auth-link";
 import { AuthFormScreen } from "@/shared/components/auth-form-screen";
 
 export default function LoginScreen() {
@@ -48,12 +49,12 @@ export default function LoginScreen() {
       }}
       footer={
         <>
-          <Link href={"/(auth)/forgot-password" as never}>
+          <AuthLink href={"/(auth)/forgot-password" as never}>
             Forgot password?
-          </Link>
-          <Link href={"/(auth)/register" as never}>
+          </AuthLink>
+          <AuthLink href={"/(auth)/register" as never}>
             Create an owner account
-          </Link>
+          </AuthLink>
         </>
       }
     />

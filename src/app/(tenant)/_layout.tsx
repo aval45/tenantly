@@ -83,6 +83,8 @@ export default function TenantLayout() {
       />
       <Tabs.Screen name="invoice/[id]" options={{ href: null }} />
       <Tabs.Screen name="payment-proof" options={{ href: null }} />
+      <Tabs.Screen name="notices" options={{ href: null }} />
+      <Tabs.Screen name="complaint/[id]" options={{ href: null }} />
     </Tabs>
   );
 }

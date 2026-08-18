@@ -78,27 +78,27 @@ export default function PaymentProof() {
         proofPath: path,
         idempotencyKey,
       });
+      const userId = session?.userId ?? "";
+      const orgId = session?.activeOrganizationId ?? "";
       await Promise.all([
         cache.invalidateQueries({
-          queryKey: queryKeys.invoices(
-            session?.userId ?? "",
-            session?.activeOrganizationId ?? "",
-          ),
+          queryKey: queryKeys.invoices(userId, orgId),
         }),
         cache.invalidateQueries({
-          queryKey: queryKeys.payments(
-            session?.userId ?? "",
-            session?.activeOrganizationId ?? "",
-          ),
+          queryKey: queryKeys.payments(userId, orgId),
         }),
         cache.invalidateQueries({
-          queryKey: queryKeys.tenantDashboard(
-            session?.userId ?? "",
-            session?.activeOrganizationId ?? "",
-          ),
+          queryKey: queryKeys.tenantDashboard(userId, orgId),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.ownerDashboard(userId, orgId),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.invoice(userId, orgId, invoiceId),
         }),
       ]);
-      router.replace("/(tenant)/payments" as never);
+      if (router.canGoBack()) router.back();
+      else router.replace("/(tenant)/payments" as never);
     } catch (cause) {
       if (uploadedPath) await removeUpload("payment-proofs", uploadedPath);
       setError(toUserMessage(cause, "Payment submission failed."));

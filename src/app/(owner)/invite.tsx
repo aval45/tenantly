@@ -2,7 +2,7 @@ import { Redirect, useLocalSearchParams } from "expo-router";
 import { Pressable, Share, StyleSheet, TextInput, View } from "react-native";
 import { useState } from "react";
 import { Check } from "lucide-react-native";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { invitationService } from "@/features/invitations/service";
 import { propertyService } from "@/features/properties/service";
 import { queryKeys } from "@/shared/api/query-keys";
@@ -14,12 +14,16 @@ import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
 export default function InviteScreen() {
   const { residentId } = useLocalSearchParams<{ residentId: string }>();
   const { session } = useAuth();
+  const cache = useQueryClient();
   const colors = useTenantlyColors();
   const [email, setEmail] = useState("");
   const [link, setLink] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [propertyIds, setPropertyIds] = useState<string[]>([]);
+  const [operatorRole, setOperatorRole] = useState<
+    "manager" | "maintenance_staff"
+  >("manager");
   const isManagerInvite = !residentId;
   const properties = useQuery({
     queryKey: queryKeys.properties(
@@ -37,11 +41,25 @@ export default function InviteScreen() {
       const value = await invitationService.create({
         organizationId: session?.activeOrganizationId ?? "",
         residentId: isManagerInvite ? undefined : residentId,
-        role: isManagerInvite ? "manager" : "tenant",
+        role: isManagerInvite ? operatorRole : "tenant",
         email,
         propertyIds: isManagerInvite ? propertyIds : [],
       });
       setLink(`tenantly://accept-invitation?token=${value.token}`);
+      await Promise.all([
+        cache.invalidateQueries({
+          queryKey: queryKeys.residents(
+            session?.userId ?? "",
+            session?.activeOrganizationId ?? "",
+          ),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.ownerDashboard(
+            session?.userId ?? "",
+            session?.activeOrganizationId ?? "",
+          ),
+        }),
+      ]);
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Could not create invitation.",
@@ -54,7 +72,7 @@ export default function InviteScreen() {
     <Screen>
       <View style={s.header}>
         <AppText variant="heading">
-          Invite {isManagerInvite ? "manager" : "resident"}
+          Invite {isManagerInvite ? "team member" : "resident"}
         </AppText>
         <AppText muted>
           The secure link expires in seven days and can be used once.
@@ -77,6 +95,27 @@ export default function InviteScreen() {
       />
       {isManagerInvite ? (
         <View style={s.properties}>
+          <View style={s.roleRow}>
+            {(["manager", "maintenance_staff"] as const).map((role) => (
+              <Pressable
+                key={role}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: operatorRole === role }}
+                onPress={() => setOperatorRole(role)}
+                style={[
+                  s.role,
+                  {
+                    borderColor:
+                      operatorRole === role ? colors.accent : colors.border,
+                  },
+                ]}
+              >
+                <AppText variant="caption">
+                  {role === "manager" ? "Manager" : "Maintenance"}
+                </AppText>
+              </Pressable>
+            ))}
+          </View>
           <AppText variant="label">Assigned properties</AppText>
           {properties.data?.map((property) => {
             const selected = propertyIds.includes(property.id);
@@ -146,6 +185,14 @@ const s = StyleSheet.create({
     marginBottom: spacing.md,
   },
   properties: { gap: 8, marginBottom: spacing.md },
+  roleRow: { flexDirection: "row", gap: 8 },
+  role: {
+    minHeight: 40,
+    borderWidth: 1,
+    borderRadius: radii.control,
+    paddingHorizontal: 12,
+    justifyContent: "center",
+  },
   property: {
     minHeight: 48,
     flexDirection: "row",

@@ -8,6 +8,7 @@ import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
 import { Screen } from "@/shared/components/screen";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
+import { queryKeys } from "@/shared/api/query-keys";
 export default function ResidentSetup() {
   const { session } = useAuth();
   const router = useRouter();
@@ -28,7 +29,14 @@ export default function ResidentSetup() {
         email: values.email,
         phone: values.phone,
       });
-      await cache.invalidateQueries({ queryKey: ["residents", org] });
+      await Promise.all([
+        cache.invalidateQueries({
+          queryKey: queryKeys.residents(session?.userId ?? "", org),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.ownerDashboard(session?.userId ?? "", org),
+        }),
+      ]);
       router.replace({
         pathname: "/(owner)/invite" as never,
         params: { residentId },

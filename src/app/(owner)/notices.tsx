@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Pressable, StyleSheet, Switch, TextInput, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, Switch, TextInput, View } from "react-native";
 import { Check } from "lucide-react-native";
 import { getSupabaseClient } from "@/shared/api/supabase";
 import { queryKeys } from "@/shared/api/query-keys";
@@ -24,6 +24,7 @@ export default function NoticesScreen() {
   const colors = useTenantlyColors();
   const cache = useQueryClient();
   const org = session?.activeOrganizationId ?? "";
+  const userId = session?.userId ?? "";
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [pinned, setPinned] = useState(false);
@@ -38,7 +39,7 @@ export default function NoticesScreen() {
     session?.capabilities.publishOrganizationNotices ? [org] : [],
   );
   const query = useQuery({
-    queryKey: queryKeys.notices(session?.userId ?? "", org),
+    queryKey: queryKeys.notices(userId, org),
     queryFn: async () => {
       const { data, error } = await getSupabaseClient()
         .from("notices")
@@ -52,7 +53,7 @@ export default function NoticesScreen() {
     enabled: !!org,
   });
   const targets = useQuery({
-    queryKey: ["notice-target-options", session?.userId, org, targetType],
+    queryKey: ["notice-target-options", userId, org, targetType],
     queryFn: async () => {
       const client = getSupabaseClient();
       if (targetType === "organization")
@@ -108,9 +109,14 @@ export default function NoticesScreen() {
         : "property";
       setTargetType(defaultTarget);
       setTargetIds(defaultTarget === "organization" ? [org] : []);
-      await cache.invalidateQueries({
-        queryKey: queryKeys.notices(session?.userId ?? "", org),
-      });
+      await Promise.all([
+        cache.invalidateQueries({
+          queryKey: queryKeys.notices(userId, org),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.tenantDashboard(userId, org),
+        }),
+      ]);
     } catch (cause) {
       setError(toUserMessage(cause, "Notice could not be published."));
     } finally {
@@ -118,7 +124,15 @@ export default function NoticesScreen() {
     }
   }
   return (
-    <Screen>
+    <Screen
+      refreshControl={
+        <RefreshControl
+          refreshing={query.isRefetching}
+          onRefresh={() => void query.refetch()}
+          tintColor={colors.primary}
+        />
+      }
+    >
       <View style={s.header}>
         <AppText variant="heading">Notices</AppText>
         <AppText muted>

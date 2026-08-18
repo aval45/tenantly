@@ -34,4 +34,10 @@ export const queryKeys = {
     ["tenantly", "owner-dashboard", userId, organizationId] as const,
   tenantMore: (userId: string, organizationId: string) =>
     ["tenantly", "tenant-more", userId, organizationId] as const,
+  expenses: (userId: string, organizationId: string, periodStart: string) =>
+    ["tenantly", "expenses", userId, organizationId, periodStart] as const,
+  profit: (userId: string, organizationId: string, periodStart: string) =>
+    ["tenantly", "profit", userId, organizationId, periodStart] as const,
+  maintenanceTasks: (userId: string, organizationId: string) =>
+    ["tenantly", "maintenance-tasks", userId, organizationId] as const,
 };

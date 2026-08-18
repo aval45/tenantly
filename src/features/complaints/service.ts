@@ -66,4 +66,37 @@ export const complaintService = {
     if (error) throw error;
     return data;
   },
+  async details(id: string) {
+    const client = getSupabaseClient();
+    const [complaint, events, attachments] = await Promise.all([
+      client.from("complaints").select("*").eq("id", id).single(),
+      client
+        .from("complaint_events")
+        .select("*")
+        .eq("complaint_id", id)
+        .order("created_at", { ascending: true }),
+      client
+        .from("attachments")
+        .select("*")
+        .eq("entity_type", "complaint")
+        .eq("entity_id", id),
+    ]);
+    if (complaint.error) throw complaint.error;
+    if (events.error) throw events.error;
+    if (attachments.error) throw attachments.error;
+    return {
+      complaint: complaint.data,
+      events: events.data,
+      attachments: attachments.data,
+    };
+  },
+  async assign(id: string, membershipId: string, note?: string) {
+    const { data, error } = await getSupabaseClient().rpc("assign_complaint", {
+      requested_complaint_id: id,
+      requested_membership_id: membershipId,
+      assignment_note: note ?? "",
+    });
+    if (error) throw error;
+    return data;
+  },
 };

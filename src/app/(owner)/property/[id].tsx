@@ -1,7 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, BedDouble, Plus } from "lucide-react-native";
-import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { BedDouble, Pencil, Plus } from "lucide-react-native";
+import { Alert, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { propertyService } from "@/features/properties/service";
 import { roomService } from "@/features/properties/rooms";
 import { useAuth } from "@/shared/auth/auth-provider";
@@ -15,16 +15,19 @@ export default function PropertyDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const colors = useTenantlyColors();
+  const cache = useQueryClient();
   const { session } = useAuth();
+  const userId = session?.userId ?? "";
+  const orgId = session?.activeOrganizationId ?? "";
   const query = useQuery({
     queryKey: queryKeys.property(
-      session?.userId ?? "",
-      session?.activeOrganizationId ?? "",
+      userId,
+      orgId,
       id,
     ),
     queryFn: async () =>
       Promise.all([
-        propertyService.get(session?.activeOrganizationId ?? "", id),
+        propertyService.get(orgId, id),
         roomService.listForProperty(id),
       ]),
     enabled: !!id,
@@ -59,8 +62,22 @@ export default function PropertyDetail() {
         {
           text: "Archive",
           style: "destructive",
-          onPress: () =>
-            void propertyService.archive(property.id).then(() => router.back()),
+          onPress: async () => {
+            await propertyService.archive(property.id);
+            await Promise.all([
+              cache.invalidateQueries({
+                queryKey: queryKeys.properties(userId, orgId),
+              }),
+              cache.invalidateQueries({
+                queryKey: queryKeys.ownerDashboard(userId, orgId),
+              }),
+              cache.invalidateQueries({
+                queryKey: queryKeys.property(userId, orgId, property.id),
+              }),
+            ]);
+            if (router.canGoBack()) router.back();
+            else router.replace("/(owner)/properties" as never);
+          },
         },
       ],
     );
@@ -71,27 +88,34 @@ export default function PropertyDetail() {
       {
         text: "Archive",
         style: "destructive",
-        onPress: () =>
-          void roomService.archive(roomId).then(() => query.refetch()),
+        onPress: async () => {
+          await roomService.archive(roomId);
+          await Promise.all([
+            query.refetch(),
+            cache.invalidateQueries({
+              queryKey: queryKeys.rooms(userId, orgId, id),
+            }),
+            cache.invalidateQueries({
+              queryKey: queryKeys.properties(userId, orgId),
+            }),
+            cache.invalidateQueries({
+              queryKey: queryKeys.ownerDashboard(userId, orgId),
+            }),
+          ]);
+        },
       },
     ]);
   }
   return (
-    <Screen>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() =>
-          router.canGoBack()
-            ? router.back()
-            : router.replace("/(owner)/properties" as never)
-        }
-        style={s.back}
-      >
-        <ArrowLeft size={20} color={colors.primary} />
-        <AppText variant="label" style={{ color: colors.primary }}>
-          Properties
-        </AppText>
-      </Pressable>
+    <Screen
+      refreshControl={
+        <RefreshControl
+          refreshing={query.isRefetching}
+          onRefresh={() => void query.refetch()}
+          tintColor={colors.primary}
+        />
+      }
+    >
       {property ? (
         <>
           <View style={s.heading}>
@@ -102,6 +126,21 @@ export default function PropertyDetail() {
             <AppText muted>
               {property.addressLine1}, {property.city}
             </AppText>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() =>
+                router.push({
+                  pathname: "/(owner)/property-setup" as never,
+                  params: { id: property.id },
+                })
+              }
+              style={s.edit}
+            >
+              <Pencil size={16} color={colors.primary} />
+              <AppText variant="caption" style={{ color: colors.primary }}>
+                Edit property
+              </AppText>
+            </Pressable>
           </View>
           <View style={[s.summary, { backgroundColor: colors.primarySoft }]}>
             <BedDouble size={20} color={colors.primary} />
@@ -126,6 +165,22 @@ export default function PropertyDetail() {
                   <AppText variant="label">
                     {formatMoney(room.monthlyRentPaise)}
                   </AppText>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() =>
+                      router.push({
+                        pathname: "/(owner)/room-setup" as never,
+                        params: { propertyId: id, roomId: room.id },
+                      })
+                    }
+                  >
+                    <AppText
+                      variant="caption"
+                      style={{ color: colors.primary }}
+                    >
+                      Edit
+                    </AppText>
+                  </Pressable>
                   <Pressable
                     accessibilityRole="button"
                     onPress={() => confirmArchiveRoom(room.id)}
@@ -178,6 +233,13 @@ const s = StyleSheet.create({
     marginTop: spacing.sm,
   },
   heading: { gap: 5, paddingVertical: spacing.lg },
+  edit: {
+    minHeight: 36,
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   summary: {
     borderRadius: radii.card,
     padding: spacing.md,

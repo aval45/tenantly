@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { getSupabaseClient } from "@/shared/api/supabase";
-import { formatDate } from "@/shared/utils/date";
+import { formatDate, localMonthStartISO } from "@/shared/utils/date";
 import { queryKeys } from "@/shared/api/query-keys";
 import { formatCompactMoney } from "@/shared/utils/money";
 import type { OwnerDashboard } from "./types";
@@ -20,34 +20,44 @@ async function getOwnerDashboard(
   ownerName: string,
 ): Promise<OwnerDashboard | null> {
   const client = getSupabaseClient();
-  const [{ data: aggregate, error }, organization, payments, complaints] =
-    await Promise.all([
-      client.rpc("owner_dashboard", {
-        requested_organization_id: organizationId,
-      }),
-      client
-        .from("organizations")
-        .select("name")
-        .eq("id", organizationId)
-        .single(),
-      client
-        .from("payments")
-        .select("*")
-        .eq("organization_id", organizationId)
-        .order("created_at", { ascending: false })
-        .limit(5),
-      client
-        .from("complaints")
-        .select("*")
-        .eq("organization_id", organizationId)
-        .in("status", ["open", "assigned", "in_progress", "reopened"])
-        .order("created_at", { ascending: false })
-        .limit(3),
-    ]);
+  const [
+    { data: aggregate, error },
+    organization,
+    payments,
+    complaints,
+    profit,
+  ] = await Promise.all([
+    client.rpc("owner_dashboard", {
+      requested_organization_id: organizationId,
+    }),
+    client
+      .from("organizations")
+      .select("name")
+      .eq("id", organizationId)
+      .single(),
+    client
+      .from("payments")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false })
+      .limit(5),
+    client
+      .from("complaints")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .in("status", ["open", "assigned", "in_progress", "reopened"])
+      .order("created_at", { ascending: false })
+      .limit(3),
+    client.rpc("monthly_profit_report", {
+      requested_organization_id: organizationId,
+      requested_period_start: localMonthStartISO(),
+    }),
+  ]);
   if (error) throw error;
   if (organization.error) throw organization.error;
   if (payments.error) throw payments.error;
   if (complaints.error) throw complaints.error;
+  if (profit.error) throw profit.error;
   const payerIds = [
     ...new Set(payments.data.map((item) => item.payer_resident_id)),
   ];
@@ -105,6 +115,16 @@ async function getOwnerDashboard(
         value: String(values.openComplaints),
         detail: "Require attention",
         tone: "danger",
+      },
+      {
+        id: "profit",
+        label: "Net profit",
+        value: formatCompactMoney(
+          (profit.data as { netProfitPaise?: number } | null)?.netProfitPaise ??
+            0,
+        ),
+        detail: "Collected rent minus expenses",
+        tone: "success",
       },
     ],
     attention: [

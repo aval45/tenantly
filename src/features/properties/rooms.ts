@@ -71,6 +71,24 @@ export const roomService = {
     if (error) throw error;
     return data;
   },
+  async update(
+    id: string,
+    input: Pick<
+      CreateRoomCommand,
+      "code" | "floor" | "monthlyRentPaise" | "depositPaise"
+    >,
+  ) {
+    const { error } = await getSupabaseClient()
+      .from("rooms")
+      .update({
+        code: input.code.trim(),
+        floor_label: input.floor?.trim() || null,
+        default_rent_paise: input.monthlyRentPaise,
+        default_deposit_paise: input.depositPaise,
+      })
+      .eq("id", id);
+    if (error) throw error;
+  },
   async archive(id: string) {
     const { error } = await getSupabaseClient()
       .from("rooms")

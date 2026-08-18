@@ -31,6 +31,7 @@ const links = [
   { label: "Notices", path: "/(owner)/notices", Icon: Megaphone },
   { label: "Notifications", path: "/notifications", Icon: Bell },
   { label: "Documents & reports", path: "/(owner)/reports", Icon: FileText },
+  { label: "Operations", path: "/(owner)/operations", Icon: ClipboardList },
 ] as const;
 export default function MoreScreen() {
   const colors = useTenantlyColors();
@@ -75,7 +76,7 @@ export default function MoreScreen() {
           >
             <UserPlus size={19} color={colors.primary} />
             <AppText variant="label" style={{ flex: 1 }}>
-              Invite manager
+              Invite team member
             </AppText>
             <ChevronRight size={18} color={colors.textMuted} />
           </Pressable>

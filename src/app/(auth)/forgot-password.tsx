@@ -1,6 +1,6 @@
-import { Link } from "expo-router";
 import { useState } from "react";
 import { useAuth } from "@/shared/auth/auth-provider";
+import { AuthLink } from "@/shared/components/auth-link";
 import { AuthFormScreen } from "@/shared/components/auth-form-screen";
 
 export default function ForgotPasswordScreen() {
@@ -33,7 +33,7 @@ export default function ForgotPasswordScreen() {
           );
         }
       }}
-      footer={<Link href="/(auth)/login">Back to sign in</Link>}
+      footer={<AuthLink href="/(auth)/login">Back to sign in</AuthLink>}
     />
   );
 }

@@ -100,12 +100,8 @@ export default function ResidentsScreen() {
               accessibilityRole="button"
               onPress={() =>
                 router.push({
-                  pathname: (tenancy
-                    ? "/(owner)/occupancy-manage"
-                    : "/(owner)/tenancy-setup") as never,
-                  params: tenancy
-                    ? { tenancyId: tenancy.id, residentName: item.full_name }
-                    : { residentId: item.id },
+                  pathname: "/(owner)/resident/[id]" as never,
+                  params: { id: item.id },
                 })
               }
               style={[s.row, { borderColor: colors.border }]}

@@ -169,9 +169,16 @@ export default function TenantHome() {
           </AppText>
         </View>
       </View>
-      <AppText variant="section" style={s.section}>
-        Pinned notices
-      </AppText>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => router.push("/(tenant)/notices" as never)}
+        style={s.noticeHeader}
+      >
+        <AppText variant="section">Pinned notices</AppText>
+        <AppText variant="caption" style={{ color: colors.accent }}>
+          View all
+        </AppText>
+      </Pressable>
       {!query.data?.notices.length ? (
         <EmptyLedger
           title="No pinned notices"
@@ -216,6 +223,13 @@ const s = StyleSheet.create({
     gap: 7,
   },
   section: { marginTop: spacing.lg, marginBottom: 10 },
+  noticeHeader: {
+    marginTop: spacing.lg,
+    marginBottom: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   tiles: { flexDirection: "row", gap: 10 },
   tile: {
     flex: 1,

@@ -31,5 +31,7 @@ export default function LaunchRoute() {
     return <Redirect href="/(owner)" />;
   if (activeMembership?.role === "tenant")
     return <Redirect href={"/(tenant)" as never} />;
+  if (activeMembership?.role === "maintenance_staff")
+    return <Redirect href={"/(staff)" as never} />;
   return <Redirect href="/unauthorized" />;
 }

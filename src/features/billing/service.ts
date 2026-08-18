@@ -12,6 +12,15 @@ export const paymentSubmissionSchema = z.object({
   idempotencyKey: z.string().min(8).max(128),
 });
 
+export const manualPaymentSchema = z.object({
+  invoiceId: z.uuid(),
+  amountPaise: z.number().int().positive(),
+  paidOn: z.string().date(),
+  method: z.enum(["cash", "upi", "bank_transfer", "other"]).default("cash"),
+  reference: z.string().trim().max(120).optional(),
+  idempotencyKey: z.string().min(8).max(128),
+});
+
 export function summarizeInvoices<
   T extends { balance_paise: number | null; due_date: string },
 >(invoices: T[]) {
@@ -180,5 +189,25 @@ export const billingService = {
     });
     if (error) throw error;
     return data;
+  },
+  async recordManualPayment(input: z.input<typeof manualPaymentSchema>) {
+    const value = manualPaymentSchema.parse(input);
+    const { data, error } = await getSupabaseClient().rpc(
+      "record_manual_payment",
+      {
+        requested_invoice_id: value.invoiceId,
+        requested_amount_paise: value.amountPaise,
+        requested_paid_on: value.paidOn,
+        requested_method: value.method as PaymentMethod,
+        requested_reference: value.reference ?? "",
+        request_idempotency_key: value.idempotencyKey,
+      },
+    );
+    if (error) throw error;
+    return data as {
+      paymentId: string;
+      receiptId: string;
+      receiptNumber: string;
+    };
   },
 };

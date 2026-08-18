@@ -385,6 +385,7 @@ export type Database = {
           profile_id: string | null;
           resident_id: string | null;
           storage_path: string;
+          supersedes_document_id: string | null;
           updated_at: string;
           uploaded_by: string;
           verification_status: Database["public"]["Enums"]["verification_status"];
@@ -398,6 +399,7 @@ export type Database = {
           profile_id?: string | null;
           resident_id?: string | null;
           storage_path: string;
+          supersedes_document_id?: string | null;
           updated_at?: string;
           uploaded_by: string;
           verification_status?: Database["public"]["Enums"]["verification_status"];
@@ -411,6 +413,7 @@ export type Database = {
           profile_id?: string | null;
           resident_id?: string | null;
           storage_path?: string;
+          supersedes_document_id?: string | null;
           updated_at?: string;
           uploaded_by?: string;
           verification_status?: Database["public"]["Enums"]["verification_status"];
@@ -449,6 +452,72 @@ export type Database = {
             columns: ["uploaded_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      expenses: {
+        Row: {
+          amount_paise: number;
+          category: Database["public"]["Enums"]["expense_category"];
+          created_at: string;
+          created_by: string;
+          description: string;
+          id: string;
+          incurred_on: string;
+          organization_id: string;
+          property_id: string;
+          receipt_storage_path: string | null;
+          status: Database["public"]["Enums"]["expense_status"];
+          updated_at: string;
+          vendor_name: string | null;
+          void_reason: string | null;
+          voided_at: string | null;
+          voided_by: string | null;
+        };
+        Insert: {
+          amount_paise: number;
+          category: Database["public"]["Enums"]["expense_category"];
+          created_at?: string;
+          created_by: string;
+          description: string;
+          id?: string;
+          incurred_on: string;
+          organization_id: string;
+          property_id: string;
+          receipt_storage_path?: string | null;
+          status?: Database["public"]["Enums"]["expense_status"];
+          updated_at?: string;
+          vendor_name?: string | null;
+          void_reason?: string | null;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Update: {
+          amount_paise?: number;
+          category?: Database["public"]["Enums"]["expense_category"];
+          description?: string;
+          incurred_on?: string;
+          receipt_storage_path?: string | null;
+          status?: Database["public"]["Enums"]["expense_status"];
+          vendor_name?: string | null;
+          void_reason?: string | null;
+          voided_at?: string | null;
+          voided_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "expenses_organization_id_fkey";
+            columns: ["organization_id"];
+            isOneToOne: false;
+            referencedRelation: "organizations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "expenses_property_id_fkey";
+            columns: ["property_id"];
+            isOneToOne: false;
+            referencedRelation: "properties";
             referencedColumns: ["id"];
           },
         ];
@@ -1788,6 +1857,14 @@ export type Database = {
         Args: { requested_profile_id: string };
         Returns: boolean;
       };
+      assign_complaint: {
+        Args: {
+          assignment_note?: string;
+          requested_complaint_id: string;
+          requested_membership_id: string;
+        };
+        Returns: string;
+      };
       create_complaint_with_attachment: {
         Args: {
           requested_category: string;
@@ -1881,6 +1958,13 @@ export type Database = {
         Args: { requested_organization_id: string };
         Returns: Json;
       };
+      monthly_profit_report: {
+        Args: {
+          requested_organization_id: string;
+          requested_period_start: string;
+        };
+        Returns: Json;
+      };
       publish_notice: {
         Args: {
           requested_body: string;
@@ -1898,6 +1982,40 @@ export type Database = {
           requested_organization_id: string;
           requested_resident_id: string;
           requested_storage_path: string;
+        };
+        Returns: string;
+      };
+      record_expense: {
+        Args: {
+          requested_amount_paise: number;
+          requested_category: Database["public"]["Enums"]["expense_category"];
+          requested_description: string;
+          requested_incurred_on: string;
+          requested_organization_id: string;
+          requested_property_id: string;
+          requested_receipt_path?: string;
+          requested_vendor_name?: string;
+        };
+        Returns: string;
+      };
+      record_manual_payment: {
+        Args: {
+          request_idempotency_key?: string;
+          requested_amount_paise: number;
+          requested_invoice_id: string;
+          requested_method?: Database["public"]["Enums"]["payment_method"];
+          requested_paid_on: string;
+          requested_reference?: string;
+        };
+        Returns: Json;
+      };
+      renew_agreement: {
+        Args: {
+          requested_expires_on: string;
+          requested_organization_id: string;
+          requested_resident_id: string;
+          requested_storage_path: string;
+          requested_supersedes_document_id?: string;
         };
         Returns: string;
       };
@@ -1936,6 +2054,10 @@ export type Database = {
         };
         Returns: string;
       };
+      void_expense: {
+        Args: { requested_expense_id: string; requested_reason: string };
+        Returns: string;
+      };
     };
     Enums: {
       account_status: "active" | "suspended" | "closed";
@@ -1948,6 +2070,9 @@ export type Database = {
         | "closed"
         | "reopened"
         | "rejected";
+      expense_category:
+        "maintenance" | "utilities" | "supplies" | "staff" | "taxes" | "other";
+      expense_status: "recorded" | "void";
       inventory_status: "active" | "inactive" | "archived";
       invoice_item_type:
         "rent" | "utilities" | "mess" | "discount" | "late_fee" | "adjustment";
@@ -2118,6 +2243,15 @@ export const Constants = {
         "reopened",
         "rejected",
       ],
+      expense_category: [
+        "maintenance",
+        "utilities",
+        "supplies",
+        "staff",
+        "taxes",
+        "other",
+      ],
+      expense_status: ["recorded", "void"],
       inventory_status: ["active", "inactive", "archived"],
       invoice_item_type: [
         "rent",
@@ -2175,3 +2309,4 @@ export type PaymentMethod = Database["public"]["Enums"]["payment_method"];
 export type ComplaintStatus = Database["public"]["Enums"]["complaint_status"];
 export type InvoiceRow = Tables<"invoices">;
 export type ReceiptRow = Tables<"receipts">;
+export type ExpenseRow = Tables<"expenses">;

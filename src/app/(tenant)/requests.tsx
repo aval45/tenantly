@@ -3,7 +3,7 @@ import * as Crypto from "expo-crypto";
 import * as ImagePicker from "expo-image-picker";
 import { ImagePlus } from "lucide-react-native";
 import { useState } from "react";
-import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, TextInput, View } from "react-native";
 import { complaintService } from "@/features/complaints/service";
 import { getTenantContext } from "@/features/tenant/api";
 import { getSupabaseClient } from "@/shared/api/supabase";
@@ -12,6 +12,7 @@ import { useAuth } from "@/shared/auth/auth-provider";
 import { AppText } from "@/shared/components/app-text";
 import { PrimaryButton } from "@/shared/components/primary-button";
 import { Screen } from "@/shared/components/screen";
+import { useRouter } from "expo-router";
 import {
   EmptyLedger,
   LoadingSkeleton,
@@ -22,6 +23,7 @@ import { prepareProofImage, removeUpload } from "@/shared/storage/uploads";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
 export default function TenantRequests() {
   const { session } = useAuth();
+  const router = useRouter();
   const colors = useTenantlyColors();
   const cache = useQueryClient();
   const [title, setTitle] = useState("");
@@ -86,12 +88,33 @@ export default function TenantRequests() {
       setTitle("");
       setDescription("");
       setAsset(null);
-      await cache.invalidateQueries({
-        queryKey: queryKeys.complaints(
-          session?.userId ?? "",
-          session?.activeOrganizationId ?? "",
-        ),
-      });
+      await Promise.all([
+        query.refetch(),
+        cache.invalidateQueries({
+          queryKey: queryKeys.complaints(
+            session?.userId ?? "",
+            session?.activeOrganizationId ?? "",
+          ),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.tenantDashboard(
+            session?.userId ?? "",
+            session?.activeOrganizationId ?? "",
+          ),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.ownerDashboard(
+            session?.userId ?? "",
+            session?.activeOrganizationId ?? "",
+          ),
+        }),
+        cache.invalidateQueries({
+          queryKey: queryKeys.maintenanceTasks(
+            session?.userId ?? "",
+            session?.activeOrganizationId ?? "",
+          ),
+        }),
+      ]);
     } catch (cause) {
       if (uploadedPath)
         await removeUpload("complaint-attachments", uploadedPath);
@@ -101,7 +124,15 @@ export default function TenantRequests() {
     }
   }
   return (
-    <Screen>
+    <Screen
+      refreshControl={
+        <RefreshControl
+          refreshing={query.isRefetching}
+          onRefresh={() => void query.refetch()}
+          tintColor={colors.primary}
+        />
+      }
+    >
       <View style={s.header}>
         <AppText variant="heading">Requests</AppText>
         <AppText muted>Report a maintenance or service issue.</AppText>
@@ -180,12 +211,22 @@ export default function TenantRequests() {
         />
       ) : null}
       {query.data?.complaints.map((item) => (
-        <View key={item.id} style={[s.item, { borderColor: colors.border }]}>
+        <Pressable
+          key={item.id}
+          accessibilityRole="button"
+          onPress={() =>
+            router.push({
+              pathname: "/(tenant)/complaint/[id]" as never,
+              params: { id: item.id },
+            })
+          }
+          style={[s.item, { borderColor: colors.border }]}
+        >
           <AppText variant="label">{item.title}</AppText>
           <AppText variant="caption" muted>
             {item.priority} · {item.status.replace("_", " ")}
           </AppText>
-        </View>
+        </Pressable>
       ))}
     </Screen>
   );

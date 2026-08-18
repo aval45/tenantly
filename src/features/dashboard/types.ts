@@ -1,5 +1,5 @@
 export type DashboardMetric = {
-  id: "occupancy" | "outstanding" | "approvals" | "complaints";
+  id: "occupancy" | "outstanding" | "approvals" | "complaints" | "profit";
   label: string;
   value: string;
   detail: string;
