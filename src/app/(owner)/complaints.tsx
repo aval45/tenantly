@@ -123,7 +123,7 @@ export default function ComplaintsScreen() {
         }
         renderItem={({ item }) => (
           <Pressable
-            accessibilityRole="button"
+            accessibilityRole="link"
             onPress={() =>
               router.push({
                 pathname: "/(owner)/complaint/[id]" as never,
@@ -144,7 +144,10 @@ export default function ComplaintsScreen() {
                 accessibilityRole="button"
                 accessibilityState={{ disabled: busyId === item.id }}
                 disabled={busyId === item.id}
-                onPress={() => void advance(item.id, item.status)}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  void advance(item.id, item.status);
+                }}
                 style={[s.action, { backgroundColor: colors.primarySoft }]}
               >
                 <AppText variant="caption">

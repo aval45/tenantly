@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { Alert, RefreshControl, StyleSheet, TextInput, View } from "react-native";
+import { RefreshControl, StyleSheet, TextInput, View } from "react-native";
 import { Image } from "expo-image";
 import {
   billingService,
@@ -18,6 +18,7 @@ import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
 import { formatDate } from "@/shared/utils/date";
 import { LoadingSkeleton, StateView } from "@/shared/components/state-views";
 import { toUserMessage } from "@/shared/errors/to-user-message";
+import { showAlert } from "@/shared/utils/alert";
 export default function PaymentDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -78,7 +79,7 @@ export default function PaymentDetail() {
   async function performDecision(approve: boolean) {
     if (!payment) return;
     if (!approve && reason.trim().length < 3) {
-      Alert.alert(
+      showAlert(
         "Reason required",
         "Please provide a reason for rejecting this payment (at least 3 characters).",
       );
@@ -91,7 +92,7 @@ export default function PaymentDetail() {
         query.data?.invoices ?? [],
       );
       if (approve && (!allocations.length || remainingPaise > 0)) {
-        Alert.alert(
+        showAlert(
           "Cannot approve",
           "No open invoice balance can accept the full payment.",
         );
@@ -125,13 +126,13 @@ export default function PaymentDetail() {
       if (router.canGoBack()) router.back();
       else router.replace("/(owner)/rent" as never);
     } catch (cause) {
-      Alert.alert("Decision failed", toUserMessage(cause, "Try again."));
+      showAlert("Decision failed", toUserMessage(cause, "Try again."));
     } finally {
       setSaving(false);
     }
   }
   function confirmDecision(approve: boolean) {
-    Alert.alert(
+    showAlert(
       approve ? "Approve payment?" : "Reject payment?",
       approve
         ? "The payment will be allocated and an immutable receipt created."

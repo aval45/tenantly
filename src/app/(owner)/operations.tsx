@@ -2,7 +2,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import * as DocumentPicker from "expo-document-picker";
 import { useState } from "react";
-import { Alert, Pressable, RefreshControl, StyleSheet, TextInput, View } from "react-native";
+import {
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
 import { operationsService } from "@/features/operations/service";
 import { propertyService } from "@/features/properties/service";
 import { residentService } from "@/features/residents/service";
@@ -22,6 +28,7 @@ import {
   localMonthStartISO,
 } from "@/shared/utils/date";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
+import { showAlert } from "@/shared/utils/alert";
 
 const categories = [
   "maintenance",
@@ -71,15 +78,13 @@ export default function OperationsScreen() {
 
   const expenses = useQuery({
     queryKey: queryKeys.expenses(userId, organizationId, periodStart),
-    queryFn: () =>
-      operationsService.listExpenses(organizationId, periodStart),
+    queryFn: () => operationsService.listExpenses(organizationId, periodStart),
     enabled: !!organizationId,
   });
 
   const profit = useQuery({
     queryKey: queryKeys.profit(userId, organizationId, periodStart),
-    queryFn: () =>
-      operationsService.getProfit(organizationId, periodStart),
+    queryFn: () => operationsService.getProfit(organizationId, periodStart),
     enabled: !!organizationId,
   });
 
@@ -177,33 +182,29 @@ export default function OperationsScreen() {
   }
 
   function confirmVoid(expenseId: string) {
-    Alert.alert(
-      "Void expense?",
-      "The expense will remain in your audit trail.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Void",
-          style: "destructive",
-          onPress: () =>
-            void operationsService
-              .voidExpense(expenseId, "Recorded in error")
-              .then(async () => {
-                setNotice("Expense voided.");
-                await Promise.all([
-                  expenses.refetch(),
-                  profit.refetch(),
-                  cache.invalidateQueries({
-                    queryKey: queryKeys.ownerDashboard(userId, organizationId),
-                  }),
-                ]);
-              })
-              .catch((cause) =>
-                setError(toUserMessage(cause, "Expense could not be voided.")),
-              ),
-        },
-      ],
-    );
+    showAlert("Void expense?", "The expense will remain in your audit trail.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Void",
+        style: "destructive",
+        onPress: () =>
+          void operationsService
+            .voidExpense(expenseId, "Recorded in error")
+            .then(async () => {
+              setNotice("Expense voided.");
+              await Promise.all([
+                expenses.refetch(),
+                profit.refetch(),
+                cache.invalidateQueries({
+                  queryKey: queryKeys.ownerDashboard(userId, organizationId),
+                }),
+              ]);
+            })
+            .catch((cause) =>
+              setError(toUserMessage(cause, "Expense could not be voided.")),
+            ),
+      },
+    ]);
   }
 
   async function renewAgreement() {
@@ -213,7 +214,9 @@ export default function OperationsScreen() {
     }
     const expiry = agreementExpiry.trim();
     if (!expiry || !/^\d{4}-\d{2}-\d{2}$/.test(expiry)) {
-      setError("Please enter a valid expiry date in YYYY-MM-DD format (e.g. 2027-08-31).");
+      setError(
+        "Please enter a valid expiry date in YYYY-MM-DD format (e.g. 2027-08-31).",
+      );
       return;
     }
     const picked = await DocumentPicker.getDocumentAsync({

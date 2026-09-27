@@ -12,14 +12,14 @@ import { StatusBar } from "expo-status-bar";
 import { HeroUINativeProvider } from "heroui-native/provider";
 import { useFonts } from "expo-font";
 import { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Uniwind } from "uniwind";
 
 import { queryClient } from "@/shared/api/query-client";
 import { AuthProvider } from "@/shared/auth/auth-provider";
 import { AppText } from "@/shared/components/app-text";
-import { PrimaryButton } from "@/shared/components/primary-button";
+import { AppDialog } from "@/shared/components/app-dialog";
 import { useResolvedTheme, useTenantlyColors } from "@/shared/theme/tokens";
 import { copy } from "@/shared/i18n/en";
 import { useAppContextStore } from "@/stores/app-context";
@@ -44,7 +44,21 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
     >
       <AppText variant="heading">{copy.appError.title}</AppText>
       <AppText muted>{error.message}</AppText>
-      <PrimaryButton label={copy.appError.retry} onPress={retry} />
+      <Pressable
+        accessibilityRole="button"
+        onPress={retry}
+        style={({ pressed }) => [
+          styles.retryButton,
+          {
+            backgroundColor: colors.accent,
+            opacity: pressed ? motion.pressedOpacity : 1,
+          },
+        ]}
+      >
+        <AppText variant="label" style={{ color: "#fff" }}>
+          {copy.appError.retry}
+        </AppText>
+      </Pressable>
     </View>
   );
 }
@@ -84,6 +98,7 @@ export default function RootLayout() {
                 animationDuration: motion.duration,
               }}
             />
+            <AppDialog />
           </AuthProvider>
         </QueryClientProvider>
       </HeroUINativeProvider>
@@ -99,5 +114,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 24,
     gap: 16,
+  },
+  retryButton: {
+    minHeight: 44,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

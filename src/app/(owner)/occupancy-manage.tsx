@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Crypto from "expo-crypto";
 import { useState } from "react";
-import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { propertyService } from "@/features/properties/service";
 import { roomService } from "@/features/properties/rooms";
 import { residentService } from "@/features/residents/service";
@@ -14,6 +14,7 @@ import { Screen } from "@/shared/components/screen";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
 import { queryKeys } from "@/shared/api/query-keys";
 import { toUserMessage } from "@/shared/errors/to-user-message";
+import { showAlert } from "@/shared/utils/alert";
 
 export default function OccupancyManageScreen() {
   const { tenancyId, residentName } = useLocalSearchParams<{
@@ -113,7 +114,7 @@ export default function OccupancyManageScreen() {
     }
   }
   function confirmVacate() {
-    Alert.alert(
+    showAlert(
       "End tenancy and vacate?",
       "This closes the active occupancy assignment while preserving its history.",
       [

@@ -5,8 +5,8 @@ export const invitationSchema = z
     organizationId: z.string().uuid(),
     residentId: z.string().uuid().optional(),
     role: z.enum(["manager", "maintenance_staff", "tenant"]),
-    email: z.email(),
-    propertyIds: z.array(z.uuid()).default([]),
+    email: z.string().trim().email(),
+    propertyIds: z.array(z.string().uuid()).default([]),
   })
   .refine(
     (value) =>

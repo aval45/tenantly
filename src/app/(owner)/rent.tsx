@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { CalendarPlus, ChevronRight, ReceiptText } from "lucide-react-native";
-import { Alert, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { billingService } from "@/features/billing/service";
 import { useAuth } from "@/shared/auth/auth-provider";
 import { AppText } from "@/shared/components/app-text";
@@ -14,6 +14,7 @@ import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
 import { queryKeys } from "@/shared/api/query-keys";
 import { formatDate, localMonthStartISO } from "@/shared/utils/date";
 import { toUserMessage } from "@/shared/errors/to-user-message";
+import { showAlert } from "@/shared/utils/alert";
 export default function RentScreen() {
   const colors = useTenantlyColors();
   const router = useRouter();
@@ -22,10 +23,7 @@ export default function RentScreen() {
   const userId = session?.userId ?? "";
   const organizationId = session?.activeOrganizationId ?? "";
   const query = useQuery({
-    queryKey: [
-      ...queryKeys.payments(userId, organizationId),
-      "pending",
-    ],
+    queryKey: [...queryKeys.payments(userId, organizationId), "pending"],
     queryFn: () => billingService.listPendingPayments(organizationId),
     enabled: !!organizationId,
   });
@@ -51,7 +49,7 @@ export default function RentScreen() {
       ]),
   });
   function confirmGeneration() {
-    Alert.alert(
+    showAlert(
       "Generate this month’s invoices?",
       "Existing invoices are skipped; new invoices are created for eligible active tenancies.",
       [

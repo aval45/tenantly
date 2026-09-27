@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { BedDouble, Pencil, Plus } from "lucide-react-native";
-import { Alert, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { propertyService } from "@/features/properties/service";
 import { roomService } from "@/features/properties/rooms";
 import { useAuth } from "@/shared/auth/auth-provider";
@@ -11,6 +11,7 @@ import { LoadingSkeleton, StateView } from "@/shared/components/state-views";
 import { formatMoney } from "@/shared/utils/money";
 import { radii, spacing, useTenantlyColors } from "@/shared/theme/tokens";
 import { queryKeys } from "@/shared/api/query-keys";
+import { showAlert } from "@/shared/utils/alert";
 export default function PropertyDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -20,11 +21,7 @@ export default function PropertyDetail() {
   const userId = session?.userId ?? "";
   const orgId = session?.activeOrganizationId ?? "";
   const query = useQuery({
-    queryKey: queryKeys.property(
-      userId,
-      orgId,
-      id,
-    ),
+    queryKey: queryKeys.property(userId, orgId, id),
     queryFn: async () =>
       Promise.all([
         propertyService.get(orgId, id),
@@ -54,7 +51,7 @@ export default function PropertyDetail() {
   const rooms = query.data?.[1] ?? [];
   function confirmArchiveProperty() {
     if (!property) return;
-    Alert.alert(
+    showAlert(
       "Archive property?",
       "Occupied properties cannot be archived. Historical records will be preserved.",
       [
@@ -83,7 +80,7 @@ export default function PropertyDetail() {
     );
   }
   function confirmArchiveRoom(roomId: string) {
-    Alert.alert("Archive room?", "Occupied rooms cannot be archived.", [
+    showAlert("Archive room?", "Occupied rooms cannot be archived.", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Archive",

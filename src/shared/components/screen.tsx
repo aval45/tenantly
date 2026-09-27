@@ -44,8 +44,13 @@ export function Screen({
   const destination = getScreenDestination(pathname, role);
   const showBack = !isPrimaryRoute(pathname);
   const goBack = () => {
-    if (router.canGoBack()) router.back();
-    else router.replace((destination?.href ?? roleGroup) as never);
+    if (destination) {
+      router.navigate(destination.href as never);
+    } else if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace(roleGroup as never);
+    }
   };
   const content = (
     <View style={[styles.content, !scrollable && styles.staticContent]}>

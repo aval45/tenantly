@@ -1,4 +1,4 @@
-import { z, ZodError } from "zod";
+import { z } from "zod";
 import { toUserMessage } from "./to-user-message";
 
 describe("toUserMessage", () => {
@@ -11,9 +11,9 @@ describe("toUserMessage", () => {
     ).toBe(
       "Cannot archive an occupied room. Transfer or vacate residents first.",
     );
-    expect(
-      toUserMessage(new Error("P0001: manager_properties_required")),
-    ).toBe("Managers must be assigned to at least one property.");
+    expect(toUserMessage(new Error("P0001: manager_properties_required"))).toBe(
+      "Managers must be assigned to at least one property.",
+    );
   });
 
   it("maps storage upload error codes", () => {
@@ -61,9 +61,9 @@ describe("toUserMessage", () => {
   });
 
   it("handles plain Supabase/PostgREST error objects", () => {
-    expect(toUserMessage({ code: "23505", message: "duplicate key value" })).toBe(
-      "A record with these details already exists.",
-    );
+    expect(
+      toUserMessage({ code: "23505", message: "duplicate key value" }),
+    ).toBe("A record with these details already exists.");
     expect(
       toUserMessage({ message: "P0001: room_at_capacity", code: "P0001" }),
     ).toBe("This room is already at its maximum bed capacity.");
@@ -72,7 +72,9 @@ describe("toUserMessage", () => {
   it("uses a safe fallback for unknown technical failures", () => {
     expect(
       toUserMessage(
-        new Error("database host internals SQLSTATE[XX000] column x does not exist"),
+        new Error(
+          "database host internals SQLSTATE[XX000] column x does not exist",
+        ),
         "Try again later.",
       ),
     ).toBe("Try again later.");

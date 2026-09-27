@@ -4,7 +4,13 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { useState } from "react";
-import { Platform, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import {
+  Platform,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from "react-native";
 import { billingService } from "@/features/billing/service";
 import { operationsService } from "@/features/operations/service";
 import { residentService } from "@/features/residents/service";
@@ -52,12 +58,18 @@ export default function ReportsScreen() {
   });
   const residents = useQuery({
     queryKey: queryKeys.residents(userId, org),
-    queryFn: () => residentService.list(org),
+    queryFn: async () => ({
+      residents: await residentService.list(org),
+      tenancies: await residentService.listActiveTenancies(org),
+    }),
     enabled: !!org,
   });
+  const residentList = Array.isArray(residents.data)
+    ? residents.data
+    : (residents.data?.residents ?? []);
   const effectiveResidentId =
     residentId ||
-    (residents.data?.length === 1 ? (residents.data[0]?.id ?? "") : "");
+    (residentList.length === 1 ? (residentList[0]?.id ?? "") : "");
   async function exportInvoices() {
     setExporting(true);
     setError("");
@@ -265,7 +277,7 @@ export default function ReportsScreen() {
         Upload resident document
       </AppText>
       <View style={s.choices}>
-        {residents.data?.map((resident) => (
+        {residentList.map((resident) => (
           <Pressable
             key={resident.id}
             accessibilityRole="radio"

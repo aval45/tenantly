@@ -8,7 +8,7 @@ import { useAuth } from "@/shared/auth/auth-provider";
 export function PushRegistration() {
   const { session } = useAuth();
   useEffect(() => {
-    if (!session) return;
+    if (!session || Platform.OS === "web") return;
     const configuredProjectId = Constants.expoConfig?.extra?.easProjectId;
     const projectId =
       Constants.easConfig?.projectId ??

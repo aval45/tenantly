@@ -51,7 +51,7 @@ declare raw_token text := encode(extensions.gen_random_bytes(32), 'hex');
 begin
   if not public.is_org_owner(requested_organization_id) then raise exception 'forbidden'; end if;
   if requested_role not in ('manager','maintenance_staff','tenant') then raise exception 'invalid_role'; end if;
-  if normalized_email is null or normalized_email !~ '^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$' then raise exception 'valid_email_required'; end if;
+  if normalized_email is null or normalized_email !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' then raise exception 'valid_email_required'; end if;
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(requested_organization_id::text||':'||normalized_email,0));
   if requested_role = 'tenant' then
     if requested_resident_id is null or coalesce(cardinality(requested_property_ids),0) <> 0 then raise exception 'invalid_tenant_invitation'; end if;

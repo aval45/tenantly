@@ -51,10 +51,20 @@ export default function ResidentDetail() {
   const resident = query.data?.resident;
   const form = {
     fullName: (edits.fullName ?? resident?.full_name ?? "").trim(),
-    email: (edits.email ?? resident?.email_normalized ?? "").trim().toLowerCase(),
+    email: (edits.email ?? resident?.email_normalized ?? "")
+      .trim()
+      .toLowerCase(),
     phone: (edits.phone ?? resident?.phone_e164 ?? "").trim(),
-    emergencyName: (edits.emergencyName ?? resident?.emergency_name ?? "").trim(),
-    emergencyPhone: (edits.emergencyPhone ?? resident?.emergency_phone_e164 ?? "").trim(),
+    emergencyName: (
+      edits.emergencyName ??
+      resident?.emergency_name ??
+      ""
+    ).trim(),
+    emergencyPhone: (
+      edits.emergencyPhone ??
+      resident?.emergency_phone_e164 ??
+      ""
+    ).trim(),
   };
   async function save() {
     if (!resident) return;
@@ -63,7 +73,9 @@ export default function ResidentDetail() {
     setNotice(null);
 
     if (!form.fullName || form.fullName.length < 2) {
-      setError("Please enter the resident's full legal name (at least 2 characters).");
+      setError(
+        "Please enter the resident's full legal name (at least 2 characters).",
+      );
       setSaving(false);
       return;
     }
@@ -73,12 +85,16 @@ export default function ResidentDetail() {
       return;
     }
     if (form.phone && !/^\+?[0-9]{10,15}$/.test(form.phone)) {
-      setError("Please enter a valid phone number with country code (e.g. +919876543210).");
+      setError(
+        "Please enter a valid phone number with country code (e.g. +919876543210).",
+      );
       setSaving(false);
       return;
     }
     if (form.emergencyPhone && !/^\+?[0-9]{10,15}$/.test(form.emergencyPhone)) {
-      setError("Please enter a valid emergency contact phone number with country code.");
+      setError(
+        "Please enter a valid emergency contact phone number with country code.",
+      );
       setSaving(false);
       return;
     }
@@ -238,7 +254,10 @@ export default function ResidentDetail() {
           onPress={() =>
             router.push({
               pathname: "/(owner)/invite" as never,
-              params: { residentId: resident.id },
+              params: {
+                residentId: resident.id,
+                email: resident.email_normalized ?? undefined,
+              },
             })
           }
         />

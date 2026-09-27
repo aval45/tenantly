@@ -29,7 +29,9 @@ export default function ResidentSetup() {
     const phone = (values.phone ?? "").trim();
 
     if (!fullName || fullName.length < 2) {
-      setError("Please enter the resident's full legal name (at least 2 characters).");
+      setError(
+        "Please enter the resident's full legal name (at least 2 characters).",
+      );
       setSaving(false);
       return;
     }
@@ -39,7 +41,9 @@ export default function ResidentSetup() {
       return;
     }
     if (phone && !/^\+?[0-9]{10,15}$/.test(phone)) {
-      setError("Please enter a valid phone number with country code (e.g. +919876543210).");
+      setError(
+        "Please enter a valid phone number with country code (e.g. +919876543210).",
+      );
       setSaving(false);
       return;
     }
@@ -61,7 +65,7 @@ export default function ResidentSetup() {
       ]);
       router.replace({
         pathname: "/(owner)/invite" as never,
-        params: { residentId },
+        params: { residentId, email: email || undefined },
       });
     } catch (cause) {
       setError(toUserMessage(cause, "Could not add resident."));
@@ -112,7 +116,9 @@ export default function ResidentSetup() {
         </View>
       ))}
       {error ? (
-        <AppText accessibilityRole="alert" style={{ color: colors.danger }}>{error}</AppText>
+        <AppText accessibilityRole="alert" style={{ color: colors.danger }}>
+          {error}
+        </AppText>
       ) : null}
       <PrimaryButton
         label={saving ? "Saving…" : "Add resident"}
